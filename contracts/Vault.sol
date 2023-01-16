@@ -8,32 +8,37 @@ import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@chainlink/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 import "@chainlink/src/v0.8/ChainlinkClient.sol";
 import "./interfaces/IVault.sol";
+import "./interfaces/IVaultManager.sol";
 
 contract Vault is
     IVault,
-    ChainlinkClient,
     Initializable,
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable,
-    AutomationCompatibleInterface,
     PausableUpgradeable,
     OwnableUpgradeable
 {
     using SafeERC20 for IERC20Metadata;
     using Chainlink for Chainlink.Request;
 
-    bytes32 jobSpec;
+    IVaultManager public vaultManager;
 
-    function initialize(address oracle, bytes32 spec) public initializer {
+    mapping(bytes32 => Order) public orders;
+
+    event OrderCreated(bytes32 indexed orderNumber, uint256 amount);
+    event OrderUpdated(bytes32 indexed orderNumber, Status status);
+
+    /**
+     * @param manager the vault manager contract address.
+     */
+    function initialize(address manager) public initializer {
+        require(manager != address(0), "Vault: vault manager cannot be zero address");
         __Ownable_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
-        setChainlinkToken(_link);
-        setChainlinkOracle(oracle);
-        setSpec(spec);
+        setManager(manager);
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -43,28 +48,25 @@ contract Vault is
         return "1.0.0";
     }
 
-    function requestTracking(bytes32 specId, uint256 payment, string calldata trackingNumber, string calldata company)
-        internal
-    {
-        Chainlink.Request memory req = buildChainlinkRequest(specId, address(this), this.fulfillTracking.selector);
-        req.add("trackingNumber", trackingNumber);
-        req.add("company", company);
-        sendOperatorRequest(req, payment);
-    }
-
-    function checkUpkeep(bytes calldata checkData)
-        external
-        view
-        override
-        returns (bool upkeepNeeded, bytes memory performData)
-    {
-        (uint256 limit, uint256 minDepth, uint8 queueId) = abi.decode(checkData, (uint256, uint256, uint8));
-
-        return (upkeepNeeded, performData);
-    }
-
-    function performUpkeep(bytes calldata performData) external override whenNotPaused nonReentrant {
-        (uint256 limit, uint256 depth, uint8 queueId) = abi.decode(performData, (uint256, uint256, uint8));
+    function addOrder(bytes32 orderNumber, uint256 amount) external payable override {
+        require(!orders[orderNumber].active, "Vault: order already exists");
+        require(msg.value >= amount, "Vault: not enough sent");
+        bytes32 orderId = keccak256(abi.encodePacked(orderNumber));
+        orders[orderNumber] = Order({
+            Id: orderId,
+            trackingNumber: "",
+            company: "",
+            status: Status.Pending,
+            lastUpdate: block.timestamp,
+            lastPrice: 0,
+            lastDepth: 0,
+            lastLimit: 0,
+            lastQueue: 0,
+            active: true,
+            notes: new bytes[](0)
+        });
+        vaultManager.registerOrder(orderId);
+        emit OrderCreated(orderNumber, msg.value);
     }
 
     /**
@@ -72,6 +74,29 @@ contract Vault is
      */
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    function updateOrder(bytes32 orderId, string memory trackingNumber, string memory shippingCompany)
+        external
+        onlyOwner
+    {
+        require(orders[orderId].active, "Vault: order does not exist");
+        orders[orderId].trackingNumber = trackingNumber;
+        orders[orderId].company = shippingCompany;
+        orders[orderId].status = Status.Shipped;
+        orders[orderId].lastUpdate = block.timestamp;
+        emit OrderUpdated(orderId, orders[orderId].status);
+    }
+
+    function updateOrderStatus(bytes32 orderId, Status status) external onlyOwner {
+        require(orders[orderId].active, "Vault: order does not exist");
+        orders[orderId].status = status;
+        orders[orderId].lastUpdate = block.timestamp;
+        emit OrderUpdated(orderId, orders[orderId].status);
+    }
+
+    function getOrder(bytes32 orderId) external view returns (Order memory) {
+        return orders[orderId];
+    }
 
     function pause() external onlyOwner {
         _pause();
@@ -81,11 +106,7 @@ contract Vault is
         _unpause();
     }
 
-    function setOracle(address oracle) external onlyOwner {
-        setChainlinkOracle(oracle);
-    }
-
-    function setSpec(bytes32 spec) public onlyOwner {
-        jobSpec = spec;
+    function setManager(address manager) public onlyOwner {
+        vaultManager = IVaultManager(manager);
     }
 }
