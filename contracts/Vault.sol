@@ -9,10 +9,12 @@ import "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@chainlink/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
+import "@chainlink/src/v0.8/ChainlinkClient.sol";
 import "./interfaces/IVault.sol";
 
 contract Vault is
     IVault,
+    ChainlinkClient,
     Initializable,
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable,
@@ -21,11 +23,17 @@ contract Vault is
     OwnableUpgradeable
 {
     using SafeERC20 for IERC20Metadata;
+    using Chainlink for Chainlink.Request;
 
-    function initialize() public initializer {
+    bytes32 jobSpec;
+
+    function initialize(address oracle, bytes32 spec) public initializer {
         __Ownable_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
+        setChainlinkToken(_link);
+        setChainlinkOracle(oracle);
+        setSpec(spec);
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -33,6 +41,15 @@ contract Vault is
 
     function version() public pure returns (string memory) {
         return "1.0.0";
+    }
+
+    function requestTracking(bytes32 specId, uint256 payment, string calldata trackingNumber, string calldata company)
+        internal
+    {
+        Chainlink.Request memory req = buildChainlinkRequest(specId, address(this), this.fulfillTracking.selector);
+        req.add("trackingNumber", trackingNumber);
+        req.add("company", company);
+        sendOperatorRequest(req, payment);
     }
 
     function checkUpkeep(bytes calldata checkData)
@@ -62,5 +79,13 @@ contract Vault is
 
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    function setOracle(address oracle) external onlyOwner {
+        setChainlinkOracle(oracle);
+    }
+
+    function setSpec(bytes32 spec) public onlyOwner {
+        jobSpec = spec;
     }
 }

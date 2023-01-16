@@ -4,12 +4,12 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "../contracts/proxy/UUPSProxy.sol";
-import "../contracts/VernariManager.sol";
+import "../contracts/VaultManager.sol";
 
 contract ProxyTest is Test {
     UUPSProxy proxy;
     address admin;
-    Manager manager;
+    VaultManager manager;
 
     function setUp() public {
         admin = vm.envAddress("LOCAL_ADMIN");
@@ -19,13 +19,11 @@ contract ProxyTest is Test {
         vm.startPrank(admin);
 
         // deploy the implementation contract
-        Manager impl = new Manager();
+        VaultManager impl = new VaultManager();
 
         // proxy is the proxy contract that is called
         proxy = new UUPSProxy(address(impl), abi.encodeWithSignature("initialize()"));
-        Manager wrappedV1 = Manager(address(proxy));
-
-        wrappedV1.setNumber(42);
+        VaultManager wrappedV1 = VaultManager(address(proxy));
 
         // deploy the new implementation contract
         // Manager impl2 = new Manager();

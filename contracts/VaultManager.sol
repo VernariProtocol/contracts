@@ -9,8 +9,10 @@ import "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@chainlink/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
+import "./interfaces/IVaultManager.sol";
 
 contract VaultManager is
+    IVaultManager,
     Initializable,
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable,
@@ -30,6 +32,10 @@ contract VaultManager is
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
+
+    function version() public pure returns (string memory) {
+        return "1.0.0";
+    }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
