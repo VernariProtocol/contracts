@@ -6,24 +6,24 @@ import "forge-std/console.sol";
 import "../contracts/proxy/UUPSProxy.sol";
 import "../contracts/VaultManager.sol";
 
-contract ProxyTest is Test {
+contract VaultManagerTest is Test {
     UUPSProxy proxy;
     address admin;
     VaultManager manager;
+    VaultManager proxyManager;
 
     function setUp() public {
         admin = vm.envAddress("LOCAL_ADMIN");
+        vm.startPrank(admin);
+        // deploy the implementation contract
+        VaultManager impl = new VaultManager();
+        proxy =
+        new UUPSProxy(address(impl), abi.encodeWithSignature("initialize(address,bytes32,address)", admin, "0x68656c6c6f", admin));
+        proxyManager = VaultManager(address(proxy));
     }
 
     function testUpgrade() public {
-        vm.startPrank(admin);
-
-        // deploy the implementation contract
-        VaultManager impl = new VaultManager();
-
         // proxy is the proxy contract that is called
-        proxy = new UUPSProxy(address(impl), abi.encodeWithSignature("initialize()"));
-        VaultManager wrappedV1 = VaultManager(address(proxy));
 
         // deploy the new implementation contract
         // Manager impl2 = new Manager();
@@ -32,5 +32,11 @@ contract ProxyTest is Test {
         // Manager wrappedV2 = Manager(address(proxy));
         // wrappedV2.decrement();
         // assert(wrappedV2.number() == 41);
+    }
+
+    function testAddToQueue() public {
+        proxyManager.registerOrder("0x68656c6c6f");
+
+        assert(proxyManager.getQueueLength() == 1);
     }
 }

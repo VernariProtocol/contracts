@@ -61,10 +61,10 @@ contract VaultManager is
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     function registerOrder(bytes32 orderId) external override nonReentrant whenNotPaused {
-        addToQueue(orderId);
+        _addToQueue(orderId);
     }
 
-    function addToQueue(bytes32 orderId) internal {
+    function _addToQueue(bytes32 orderId) internal {
         EnumerableSet.add(orderQueue, orderId);
     }
 
@@ -139,5 +139,9 @@ contract VaultManager is
 
     function setPayment(uint256 payment) public onlyOwner {
         jobPayment = payment;
+    }
+
+    function getQueueLength() external view onlyOwner returns (uint256) {
+        return EnumerableSet.length(orderQueue);
     }
 }
