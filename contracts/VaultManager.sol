@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin-upgrades/contracts/security/PausableUpgradeable.sol";
-import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@chainlink/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
-import "@chainlink/src/v0.8/ChainlinkClient.sol";
-import "./interfaces/IVaultManager.sol";
-import "./interfaces/IVault.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgrades/contracts/security/PausableUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {AutomationCompatibleInterface} from "@chainlink/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
+import {ChainlinkClient, Chainlink} from "@chainlink/src/v0.8/ChainlinkClient.sol";
+import {IVaultManager} from "./interfaces/IVaultManager.sol";
+import {IVault} from "./interfaces/IVault.sol";
 
 contract VaultManager is
     IVaultManager,
@@ -31,9 +31,10 @@ contract VaultManager is
     bytes32 jobSpec;
     uint256 interval;
     uint256 jobPayment;
-    IVault public vault;
 
-    EnumerableSet.Bytes32Set private orderQueue;
+    mapping(bytes32 => EnumerableSet.Bytes32Set) private companyQueue;
+    mapping(bytes32 => bool) private activeCompanues;
+    mapping(bytes32 => address) internal vaults;
 
     /**
      * @param link the LINK token address.
@@ -60,25 +61,28 @@ contract VaultManager is
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function registerOrder(bytes32 orderId) external override nonReentrant whenNotPaused {
-        _addToQueue(orderId);
+    function registerOrder(bytes32 orderId, bytes32 company) external override nonReentrant whenNotPaused {
+        _addToQueue(orderId, company);
     }
 
-    function _addToQueue(bytes32 orderId) internal {
-        EnumerableSet.add(orderQueue, orderId);
+    function _addToQueue(bytes32 orderId, bytes32 company) internal {
+        require(activeCompanues[company], "Vault: company must be active");
+        companyQueue[company].add(orderId);
     }
 
     function requestTracking(
         bytes32 specId,
         uint256 payment,
         string memory trackingNumber,
-        string memory company,
-        bytes32 orderId
+        string memory shippingCompany,
+        bytes32 orderId,
+        bytes32 company
     ) internal {
         Chainlink.Request memory req = buildChainlinkRequest(specId, address(this), this.fulfillTracking.selector);
         req.add("trackingNumber", trackingNumber);
-        req.add("company", company);
+        req.add("shippingCompany", shippingCompany);
         req.add("orderId", string(abi.encodePacked(orderId)));
+        req.add("company", string(abi.encodePacked(company)));
         sendOperatorRequest(req, payment);
     }
 
@@ -88,14 +92,14 @@ contract VaultManager is
         cancelChainlinkRequest(requestId, payment, callbackFunctionId, expiration);
     }
 
-    function fulfillTracking(bytes32 requestId, bytes32 orderNumber, uint8 status)
+    function fulfillTracking(bytes32 requestId, bytes32 company, bytes32 orderNumber, uint8 status)
         external
         recordChainlinkFulfillment(requestId)
     {
         // update item and remove from queue if item is delivered
         if (status == uint8(IVault.Status.Delivered)) {
             removeFromQueue(orderNumber);
-            vault.updateOrderStatus(orderNumber, IVault.Status.Delivered);
+            _updateOrderStatus(orderNumber, company, IVault.Status.Delivered);
         }
     }
 
@@ -107,9 +111,11 @@ contract VaultManager is
         override
         returns (bool upkeepNeeded, bytes memory performData)
     {
-        for (uint256 i = 0; i < EnumerableSet.length(orderQueue); i++) {
-            bytes32 orderId = EnumerableSet.at(orderQueue, i);
-            IVault.Order memory order = vault.getOrder(orderId);
+        (bytes32 company) = abi.decode(checkData, (bytes32));
+        require(activeCompanues[company], "Vault: company must be active");
+        for (uint256 i = 0; i < companyQueue[company].length(); i++) {
+            bytes32 orderId = companyQueue[company].at(i);
+            IVault.Order memory order = IVault(vaults[company]).getOrder(orderId);
             if (order.status == IVault.Status.Shipped) {
                 upkeepNeeded = true;
                 break;
@@ -119,12 +125,27 @@ contract VaultManager is
         return (upkeepNeeded, performData);
     }
 
+    function addCompany(address vault, bytes32 company) external override onlyOwner {
+        require(vault != address(0), "Vault: vault cannot be zero address");
+        require(company != bytes32(0), "Vault: company cannot be zero address");
+        require(!activeCompanues[company], "Vault: company must not be active");
+        require(vaults[company] == address(0), "Vault: company must not have a vault");
+        vaults[company] = vault;
+        activeCompanues[company] = true;
+    }
+
+    function _updateOrderStatus(bytes32 orderId, bytes32 company, IVault.Status status) internal {
+        IVault(vaults[company]).updateOrderStatus(orderId, status);
+    }
+
     function performUpkeep(bytes calldata performData) external override whenNotPaused nonReentrant {
-        for (uint256 i = 0; i < EnumerableSet.length(orderQueue); i++) {
-            bytes32 orderId = EnumerableSet.at(orderQueue, i);
-            IVault.Order memory order = vault.getOrder(orderId);
+        (bytes32 company) = abi.decode(performData, (bytes32));
+        require(activeCompanues[company], "Vault: company must be active");
+        for (uint256 i = 0; i < companyQueue[company].length(); i++) {
+            bytes32 orderId = companyQueue[company].at(i);
+            IVault.Order memory order = IVault(vaults[company]).getOrder(orderId);
             if (order.status == IVault.Status.Shipped) {
-                requestTracking(jobSpec, jobPayment, order.trackingNumber, order.company, orderId);
+                requestTracking(jobSpec, jobPayment, order.trackingNumber, order.company, orderId, company);
             }
         }
     }
@@ -141,7 +162,7 @@ contract VaultManager is
         jobPayment = payment;
     }
 
-    function getQueueLength() external view onlyOwner returns (uint256) {
-        return EnumerableSet.length(orderQueue);
+    function getQueueLength(bytes32 company) external view onlyOwner returns (uint256) {
+        return companyQueue[company].length();
     }
 }

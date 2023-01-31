@@ -25,10 +25,17 @@ contract Vault is
 
     IVaultManager public vaultManager;
 
-    mapping(bytes32 => Order) public orders;
+    mapping(bytes32 => Order) internal orders;
 
     event OrderCreated(bytes32 indexed orderNumber, uint256 amount);
     event OrderUpdated(bytes32 indexed orderNumber, Status status);
+
+    modifier onlyAdmin() {
+        require(
+            msg.sender == address(vaultManager) || msg.sender == owner(), "Vault: only manager can call this function"
+        );
+        _;
+    }
 
     /**
      * @param manager the vault manager contract address.
@@ -48,7 +55,7 @@ contract Vault is
         return "1.0.0";
     }
 
-    function addOrder(bytes32 orderNumber, uint256 amount) external payable override {
+    function addOrder(bytes32 orderNumber, uint256 amount, bytes32 company) external payable override {
         require(!orders[orderNumber].active, "Vault: order already exists");
         require(msg.value >= amount, "Vault: not enough sent");
         bytes32 orderId = keccak256(abi.encodePacked(orderNumber));
@@ -65,7 +72,7 @@ contract Vault is
             active: true,
             notes: new bytes[](0)
         });
-        vaultManager.registerOrder(orderId);
+        vaultManager.registerOrder(orderId, company);
         emit OrderCreated(orderNumber, msg.value);
     }
 
@@ -87,7 +94,7 @@ contract Vault is
         emit OrderUpdated(orderId, orders[orderId].status);
     }
 
-    function updateOrderStatus(bytes32 orderId, Status status) external onlyOwner {
+    function updateOrderStatus(bytes32 orderId, Status status) external onlyAdmin {
         require(orders[orderId].active, "Vault: order does not exist");
         orders[orderId].status = status;
         orders[orderId].lastUpdate = block.timestamp;

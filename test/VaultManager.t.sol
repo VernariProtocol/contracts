@@ -12,8 +12,9 @@ contract VaultManagerTest is Test {
     VaultManager manager;
     VaultManager proxyManager;
 
+
     function setUp() public {
-        admin = vm.envAddress("LOCAL_ADMIN");
+        admin = makeAddr("admin");
         vm.startPrank(admin);
         // deploy the implementation contract
         VaultManager impl = new VaultManager();

@@ -26,7 +26,7 @@ interface IVault {
 
     function version() external pure returns (string memory);
 
-    function addOrder(bytes32 orderNumber, uint256 amount) external payable;
+    function addOrder(bytes32 orderNumber, uint256 amount, bytes32 company) external payable;
 
     function updateOrderStatus(bytes32 orderId, Status status) external;
 
