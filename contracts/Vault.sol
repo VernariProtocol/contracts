@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin-upgrades/contracts/security/PausableUpgradeable.sol";
-import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@chainlink/src/v0.8/ChainlinkClient.sol";
-import "./interfaces/IVault.sol";
-import "./interfaces/IVaultManager.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin-upgrades/contracts/security/PausableUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IVault} from "./interfaces/IVault.sol";
+import {IVaultManager} from "./interfaces/IVaultManager.sol";
 
 contract Vault is
     IVault,
@@ -21,10 +20,8 @@ contract Vault is
     OwnableUpgradeable
 {
     using SafeERC20 for IERC20Metadata;
-    using Chainlink for Chainlink.Request;
 
     IVaultManager public vaultManager;
-
     mapping(bytes32 => Order) internal orders;
 
     event OrderCreated(bytes32 indexed orderNumber, uint256 amount);
@@ -32,7 +29,7 @@ contract Vault is
 
     modifier onlyAdmin() {
         require(
-            msg.sender == address(vaultManager) || msg.sender == owner(), "Vault: only manager can call this function"
+            msg.sender == address(vaultManager) || msg.sender == owner(), "Vault: only an admin can call this function"
         );
         _;
     }
