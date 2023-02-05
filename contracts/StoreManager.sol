@@ -11,11 +11,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {AutomationCompatibleInterface} from "@chainlink/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 import {ChainlinkClient, Chainlink} from "@chainlink/src/v0.8/ChainlinkClient.sol";
-import {IVaultManager} from "./interfaces/IVaultManager.sol";
-import {IVault} from "./interfaces/IVault.sol";
+import {IStoreManager} from "./interfaces/IStoreManager.sol";
+import {IStore} from "./interfaces/IStore.sol";
 
-contract VaultManager is
-    IVaultManager,
+contract StoreManager is
+    IStoreManager,
     ChainlinkClient,
     Initializable,
     UUPSUpgradeable,
@@ -33,8 +33,8 @@ contract VaultManager is
     uint256 jobPayment;
 
     mapping(bytes32 => EnumerableSet.Bytes32Set) private companyQueue;
-    mapping(bytes32 => bool) private activeCompanues;
-    mapping(bytes32 => address) internal vaults;
+    mapping(bytes32 => bool) private activeCompanies;
+    mapping(bytes32 => address) internal stores;
 
     /**
      * @param link the LINK token address.
@@ -42,8 +42,8 @@ contract VaultManager is
      * @param spec the Chainlink job spec ID.
      */
     function initialize(address oracle, bytes32 spec, address link) public initializer {
-        require(oracle != address(0), "Vault: oracle cannot be zero address");
-        require(link != address(0), "Vault: link cannot be zero address");
+        require(oracle != address(0), "StoreManager: oracle cannot be zero address");
+        require(link != address(0), "StoreManager: link cannot be zero address");
         __Ownable_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
@@ -56,7 +56,7 @@ contract VaultManager is
     constructor() initializer {}
 
     function version() public pure returns (string memory) {
-        return "1.0.0";
+        return "0.0.1";
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -66,7 +66,7 @@ contract VaultManager is
     }
 
     function _addToQueue(bytes32 orderId, bytes32 company) internal {
-        require(activeCompanues[company], "Vault: company must be active");
+        require(activeCompanies[company], "StoreManager: company must be active");
         companyQueue[company].add(orderId);
     }
 
@@ -97,13 +97,15 @@ contract VaultManager is
         recordChainlinkFulfillment(requestId)
     {
         // update item and remove from queue if item is delivered
-        if (status == uint8(IVault.Status.Delivered)) {
-            removeFromQueue(orderNumber);
-            _updateOrderStatus(orderNumber, company, IVault.Status.Delivered);
+        if (status == uint8(IStore.Status.Delivered)) {
+            removeFromQueue(orderNumber, company);
+            _updateOrderStatus(orderNumber, company, IStore.Status.Delivered);
         }
     }
 
-    function removeFromQueue(bytes32 orderId) internal {}
+    function removeFromQueue(bytes32 orderId, bytes32 company) internal {
+        companyQueue[company].remove(orderId);
+    }
 
     function checkUpkeep(bytes calldata checkData)
         external
@@ -112,11 +114,11 @@ contract VaultManager is
         returns (bool upkeepNeeded, bytes memory performData)
     {
         (bytes32 company) = abi.decode(checkData, (bytes32));
-        require(activeCompanues[company], "Vault: company must be active");
+        require(activeCompanies[company], "StoreManager: company must be active");
         for (uint256 i = 0; i < companyQueue[company].length(); i++) {
             bytes32 orderId = companyQueue[company].at(i);
-            IVault.Order memory order = IVault(vaults[company]).getOrder(orderId);
-            if (order.status == IVault.Status.Shipped) {
+            IStore.Order memory order = IStore(stores[company]).getOrder(orderId);
+            if (order.status == IStore.Status.Shipped) {
                 upkeepNeeded = true;
                 break;
             }
@@ -125,26 +127,31 @@ contract VaultManager is
         return (upkeepNeeded, performData);
     }
 
-    function addCompany(address vault, bytes32 company) external override onlyOwner {
-        require(vault != address(0), "Vault: vault cannot be zero address");
-        require(company != bytes32(0), "Vault: company cannot be zero address");
-        require(!activeCompanues[company], "Vault: company must not be active");
-        require(vaults[company] == address(0), "Vault: company must not have a vault");
-        vaults[company] = vault;
-        activeCompanues[company] = true;
+    /**
+     * @notice Add a new company to the StoreManager.
+     * @param store the address of the store contract.
+     * @dev The company must not be active.
+     */
+    function addCompany(address store) external override onlyOwner {
+        require(store != address(0), "StoreManager: vault cannot be zero address");
+        bytes32 company = IStore(store).getCompanyName();
+        require(!activeCompanies[company], "StoreManager: company must not be active");
+        require(stores[company] == address(0), "StoreManager: company must not have a store");
+        stores[company] = store;
+        activeCompanies[company] = true;
     }
 
-    function _updateOrderStatus(bytes32 orderId, bytes32 company, IVault.Status status) internal {
-        IVault(vaults[company]).updateOrderStatus(orderId, status);
+    function _updateOrderStatus(bytes32 orderId, bytes32 company, IStore.Status status) internal {
+        IStore(stores[company]).updateOrderStatus(orderId, status);
     }
 
     function performUpkeep(bytes calldata performData) external override whenNotPaused nonReentrant {
         (bytes32 company) = abi.decode(performData, (bytes32));
-        require(activeCompanues[company], "Vault: company must be active");
+        require(activeCompanies[company], "StoreManager: company must be active");
         for (uint256 i = 0; i < companyQueue[company].length(); i++) {
             bytes32 orderId = companyQueue[company].at(i);
-            IVault.Order memory order = IVault(vaults[company]).getOrder(orderId);
-            if (order.status == IVault.Status.Shipped) {
+            IStore.Order memory order = IStore(stores[company]).getOrder(orderId);
+            if (order.status == IStore.Status.Shipped) {
                 requestTracking(jobSpec, jobPayment, order.trackingNumber, order.company, orderId, company);
             }
         }
