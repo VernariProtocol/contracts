@@ -4,22 +4,24 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "../contracts/proxy/UUPSProxy.sol";
-import "../contracts/VaultManager.sol";
+import "../contracts/StoreManager.sol";
+import "../contracts/Store.sol";
 
-contract VaultManagerTest is Test {
+contract StoreManagerTest is Test {
     UUPSProxy proxy;
     address admin;
-    VaultManager manager;
-    VaultManager proxyManager;
+    StoreManager manager;
+    StoreManager proxyManager;
+    Store store;
 
     function setUp() public {
-        admin = vm.envAddress("LOCAL_ADMIN");
+        admin = makeAddr("admin");
         vm.startPrank(admin);
         // deploy the implementation contract
-        VaultManager impl = new VaultManager();
+        StoreManager impl = new StoreManager();
         proxy =
         new UUPSProxy(address(impl), abi.encodeWithSignature("initialize(address,bytes32,address)", admin, "0x68656c6c6f", admin));
-        proxyManager = VaultManager(address(proxy));
+        proxyManager = StoreManager(address(proxy));
     }
 
     function testUpgrade() public {
@@ -34,9 +36,13 @@ contract VaultManagerTest is Test {
         // assert(wrappedV2.number() == 41);
     }
 
-    function testAddToQueue() public {
-        proxyManager.registerOrder("0x68656c6c6f");
+    function test_registerOrder_RegisterOrderSuccess() public {
+        bytes32 s = bytes32("some store");
+        Store newStore = new Store();
+        newStore.initialize(address(proxyManager), admin, s);
+        proxyManager.addCompany(address(newStore));
+        proxyManager.registerOrder("0x68656c6c6f", s);
 
-        assert(proxyManager.getQueueLength() == 1);
+        assert(proxyManager.getQueueLength(s) == 1);
     }
 }
