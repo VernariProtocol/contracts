@@ -26,13 +26,15 @@ interface IStore {
 
     function version() external pure returns (string memory);
 
-    function addOrder(bytes32 orderNumber, uint256 amount, bytes32 company) external payable;
+    function addOrder(bytes32 orderNumber, uint256 amount) external payable;
 
     function updateOrderStatus(bytes32 orderId, Status status) external;
 
     function getOrder(bytes32 orderId) external view returns (Order memory);
 
-    function initialize(address manager, address owner, bytes32 company) external;
+    function initialize(address manager, address owner, bytes memory company, uint64 subId) external;
 
-    function getCompanyName() external view returns (bytes32);
+    function getCompanyName() external view returns (bytes memory);
+
+    function getSubscriptionId() external view returns (uint64);
 }

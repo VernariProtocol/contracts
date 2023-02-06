@@ -14,7 +14,8 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     using SafeERC20 for IERC20Metadata;
 
     IStoreManager public storeManager;
-    bytes32 internal companyName;
+    bytes internal companyName;
+    uint64 internal subscriptionId;
     mapping(bytes32 => Order) internal orders;
 
     event OrderCreated(bytes32 indexed orderNumber, uint256 amount);
@@ -30,11 +31,14 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     /**
      * @param manager the vault manager contract address.
      */
-    function initialize(address manager, address owner, bytes32 company) public initializer {
+    function initialize(address manager, address owner, bytes memory company, uint64 subId) public initializer {
+        require(owner != address(0), "Store: Store owner cannot be zero address");
         require(manager != address(0), "Store: Store manager cannot be zero address");
+        require(subId != 0, "Store: subscription id cannot be zero");
         __Ownable_init();
         __Pausable_init();
         setManager(manager);
+        setSubscriptionId(subId);
         transferOwnership(owner);
         companyName = company;
     }
@@ -43,14 +47,14 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         return "v0.0.1";
     }
 
-    function addOrder(bytes32 orderNumber, uint256 amount, bytes32 company) external payable override {
+    function addOrder(bytes32 orderNumber, uint256 amount) external payable override {
         require(!orders[orderNumber].active, "Store: order already exists");
         require(msg.value >= amount, "Store: not enough sent");
         bytes32 orderId = keccak256(abi.encodePacked(orderNumber));
         orders[orderNumber] = Order({
             Id: orderId,
             trackingNumber: "",
-            company: "",
+            company: string(companyName),
             status: Status.Pending,
             lastUpdate: block.timestamp,
             lastPrice: 0,
@@ -60,7 +64,7 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
             active: true,
             notes: new bytes[](0)
         });
-        storeManager.registerOrder(orderId, company);
+        storeManager.registerOrder(orderId, companyName);
         emit OrderCreated(orderNumber, msg.value);
     }
 
@@ -91,8 +95,12 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         return orders[orderId];
     }
 
-    function getCompanyName() external view returns (bytes32) {
+    function getCompanyName() external view returns (bytes memory) {
         return companyName;
+    }
+
+    function getSubscriptionId() external view onlyAdmin returns (uint64) {
+        return subscriptionId;
     }
 
     function pause() external onlyOwner {
@@ -105,5 +113,9 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
 
     function setManager(address manager) public onlyOwner {
         storeManager = IStoreManager(manager);
+    }
+
+    function setSubscriptionId(uint64 subId) public onlyOwner {
+        subscriptionId = subId;
     }
 }

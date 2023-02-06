@@ -49,12 +49,17 @@ contract StoreFactory is IStoreFactory, Ownable {
      * @param admin The address of who will own the contract.
      * @return The address of the new instance.
      */
-    function createStore(address admin, bytes32 companyName) external hasAnInstance(admin) returns (address) {
+    function createStore(address admin, bytes calldata companyName, uint64 subId)
+        external
+        hasAnInstance(admin)
+        returns (address)
+    {
         BeaconProxy proxy = new BeaconProxy(address(beacon), abi.encodeCall(
                 IStore.initialize,
                 (manager,
                 admin,
-                companyName)
+                companyName,
+                subId)
             ));
 
         Instance storage newTenant = instances[admin];

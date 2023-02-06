@@ -13,14 +13,15 @@ contract StoreManagerTest is Test {
     StoreManager manager;
     StoreManager proxyManager;
     Store store;
+    address oracle;
 
     function setUp() public {
         admin = makeAddr("admin");
         vm.startPrank(admin);
+        oracle = makeAddr("oracle");
         // deploy the implementation contract
-        StoreManager impl = new StoreManager();
-        proxy =
-        new UUPSProxy(address(impl), abi.encodeWithSignature("initialize(address,bytes32,address)", admin, "0x68656c6c6f", admin));
+        StoreManager impl = new StoreManager(oracle);
+        proxy = new UUPSProxy(address(impl), abi.encodeWithSignature("initialize(address)", oracle));
         proxyManager = StoreManager(address(proxy));
     }
 
@@ -37,12 +38,16 @@ contract StoreManagerTest is Test {
     }
 
     function test_registerOrder_RegisterOrderSuccess() public {
-        bytes32 s = bytes32("some store");
+        bytes memory s = bytes("some store");
         Store newStore = new Store();
-        newStore.initialize(address(proxyManager), admin, s);
+        newStore.initialize(address(proxyManager), admin, s, 1);
         proxyManager.addCompany(address(newStore));
         proxyManager.registerOrder("0x68656c6c6f", s);
 
         assert(proxyManager.getQueueLength(s) == 1);
+    }
+
+    function test_getChainlinkOracleAddress_ReturnsCorrectAddress() public view {
+        assert(proxyManager.getOracleAddress() == oracle);
     }
 }
