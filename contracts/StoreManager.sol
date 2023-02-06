@@ -59,15 +59,8 @@ contract StoreManager is
         return "0.0.1";
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
-
     function registerOrder(bytes32 orderId, bytes32 company) external override nonReentrant whenNotPaused {
         _addToQueue(orderId, company);
-    }
-
-    function _addToQueue(bytes32 orderId, bytes32 company) internal {
-        require(activeCompanies[company], "StoreManager: company must be active");
-        companyQueue[company].add(orderId);
     }
 
     function requestTracking(
@@ -98,13 +91,9 @@ contract StoreManager is
     {
         // update item and remove from queue if item is delivered
         if (status == uint8(IStore.Status.Delivered)) {
-            removeFromQueue(orderNumber, company);
+            _removeFromQueue(orderNumber, company);
             _updateOrderStatus(orderNumber, company, IStore.Status.Delivered);
         }
-    }
-
-    function removeFromQueue(bytes32 orderId, bytes32 company) internal {
-        companyQueue[company].remove(orderId);
     }
 
     function checkUpkeep(bytes calldata checkData)
@@ -127,6 +116,35 @@ contract StoreManager is
         return (upkeepNeeded, performData);
     }
 
+    function performUpkeep(bytes calldata performData) external override whenNotPaused nonReentrant {
+        (bytes32 company) = abi.decode(performData, (bytes32));
+        require(activeCompanies[company], "StoreManager: company must be active");
+        for (uint256 i = 0; i < companyQueue[company].length(); i++) {
+            bytes32 orderId = companyQueue[company].at(i);
+            IStore.Order memory order = IStore(stores[company]).getOrder(orderId);
+            if (order.status == IStore.Status.Shipped) {
+                requestTracking(jobSpec, jobPayment, order.trackingNumber, order.company, orderId, company);
+            }
+        }
+    }
+
+    // Internal functions ------------------------------------------------------
+
+    function _updateOrderStatus(bytes32 orderId, bytes32 company, IStore.Status status) internal {
+        IStore(stores[company]).updateOrderStatus(orderId, status);
+    }
+
+    function _removeFromQueue(bytes32 orderId, bytes32 company) internal {
+        companyQueue[company].remove(orderId);
+    }
+
+    function _addToQueue(bytes32 orderId, bytes32 company) internal {
+        require(activeCompanies[company], "StoreManager: company must be active");
+        companyQueue[company].add(orderId);
+    }
+
+    // Admin functions ---------------------------------------------------------
+
     /**
      * @notice Add a new company to the StoreManager.
      * @param store the address of the store contract.
@@ -139,22 +157,6 @@ contract StoreManager is
         require(stores[company] == address(0), "StoreManager: company must not have a store");
         stores[company] = store;
         activeCompanies[company] = true;
-    }
-
-    function _updateOrderStatus(bytes32 orderId, bytes32 company, IStore.Status status) internal {
-        IStore(stores[company]).updateOrderStatus(orderId, status);
-    }
-
-    function performUpkeep(bytes calldata performData) external override whenNotPaused nonReentrant {
-        (bytes32 company) = abi.decode(performData, (bytes32));
-        require(activeCompanies[company], "StoreManager: company must be active");
-        for (uint256 i = 0; i < companyQueue[company].length(); i++) {
-            bytes32 orderId = companyQueue[company].at(i);
-            IStore.Order memory order = IStore(stores[company]).getOrder(orderId);
-            if (order.status == IStore.Status.Shipped) {
-                requestTracking(jobSpec, jobPayment, order.trackingNumber, order.company, orderId, company);
-            }
-        }
     }
 
     function setOracle(address oracle) external onlyOwner {
@@ -172,4 +174,6 @@ contract StoreManager is
     function getQueueLength(bytes32 company) external view onlyOwner returns (uint256) {
         return companyQueue[company].length();
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 }
