@@ -88,11 +88,13 @@ contract StoreManager is
     }
 
     function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
-        if (response.length == 0) {
-            (uint8 status, bytes32 orderNumber, bytes memory company) = abi.decode(err, (uint8, bytes32, bytes));
+        if (response.length != 0) {
+            (uint8 status, bytes32 orderNumber, bytes memory company) = abi.decode(response, (uint8, bytes32, bytes));
             if (status == uint8(IStore.Status.Delivered)) {
                 _removeFromQueue(orderNumber, company);
                 _updateOrderStatus(orderNumber, company, IStore.Status.Delivered);
+            } else {
+                IStore(stores[company]).getOrder(orderNumber).lastAutomationCheck = block.timestamp;
             }
         } else {
             latestError = err;
@@ -113,7 +115,10 @@ contract StoreManager is
         for (uint256 i = 0; i < companyQueue[company].length(); i++) {
             bytes32 orderId = companyQueue[company].at(i);
             IStore.Order memory order = IStore(stores[company]).getOrder(orderId);
-            if (order.status == IStore.Status.Shipped) {
+            if (
+                order.status == IStore.Status.Shipped
+                    && block.timestamp - order.lastAutomationCheck > IStore(stores[company]).getAutomationInterval()
+            ) {
                 upkeepNeeded = true;
                 break;
             }
@@ -128,7 +133,10 @@ contract StoreManager is
         for (uint256 i = 0; i < companyQueue[company].length(); i++) {
             bytes32 orderId = companyQueue[company].at(i);
             IStore.Order memory order = IStore(stores[company]).getOrder(orderId);
-            if (order.status == IStore.Status.Shipped) {
+            if (
+                order.status == IStore.Status.Shipped
+                    && block.timestamp - order.lastAutomationCheck > IStore(stores[company]).getAutomationInterval()
+            ) {
                 requestTracking(order.trackingNumber, order.company, orderId, company);
             }
         }

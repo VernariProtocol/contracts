@@ -3,11 +3,11 @@ pragma solidity ^0.8.13;
 
 interface IStore {
     enum Status {
-        Pending,
-        Shipped,
-        Delivered,
-        Returned,
-        Cancelled
+        PENDING,
+        SHIPPED,
+        DELIVERED,
+        RETURNED,
+        CANCELLED
     }
 
     struct Order {
@@ -22,6 +22,7 @@ interface IStore {
         uint256 lastQueue;
         bool active;
         bytes[] notes;
+        uint256 lastAutomationCheck;
     }
 
     function version() external pure returns (string memory);
@@ -32,9 +33,12 @@ interface IStore {
 
     function getOrder(bytes32 orderId) external view returns (Order memory);
 
-    function initialize(address manager, address owner, bytes memory company, uint64 subId) external;
+    function initialize(address manager, address owner, bytes memory company, uint64 subId, uint96 automationInterval)
+        external;
 
     function getCompanyName() external view returns (bytes memory);
 
     function getSubscriptionId() external view returns (uint64);
+
+    function getAutomationInterval() external view returns (uint96);
 }

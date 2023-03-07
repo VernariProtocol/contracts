@@ -16,6 +16,7 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     IStoreManager public storeManager;
     bytes internal companyName;
     uint64 internal subscriptionId;
+    uint96 automationCheckInterval;
     mapping(bytes32 => Order) internal orders;
 
     event OrderCreated(bytes32 indexed orderNumber, uint256 amount);
@@ -31,7 +32,10 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     /**
      * @param manager the vault manager contract address.
      */
-    function initialize(address manager, address owner, bytes memory company, uint64 subId) public initializer {
+    function initialize(address manager, address owner, bytes memory company, uint64 subId, uint96 automationInterval)
+        public
+        initializer
+    {
         require(owner != address(0), "Store: Store owner cannot be zero address");
         require(manager != address(0), "Store: Store manager cannot be zero address");
         require(subId != 0, "Store: subscription id cannot be zero");
@@ -41,6 +45,7 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         setSubscriptionId(subId);
         transferOwnership(owner);
         companyName = company;
+        automationCheckInterval = automationInterval;
     }
 
     function version() public pure returns (string memory) {
@@ -62,7 +67,8 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
             lastLimit: 0,
             lastQueue: 0,
             active: true,
-            notes: new bytes[](0)
+            notes: new bytes[](0),
+            lastAutomationCheck: 0
         });
         storeManager.registerOrder(orderId, companyName);
         emit OrderCreated(orderNumber, msg.value);
@@ -72,6 +78,14 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
      * ADMIN **********
      */
 
+    /**
+     * @notice updates the order tracking number and shipping company.
+     * @param orderId the order id.
+     * @param trackingNumber the tracking number.
+     * @param shippingCompany the shipping company.
+     * @dev can only be called by the owner (company).
+     * @dev called by store owner when the order is shipped.
+     */
     function updateOrder(bytes32 orderId, string memory trackingNumber, string memory shippingCompany)
         external
         onlyOwner
@@ -84,6 +98,13 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         emit OrderUpdated(orderId, orders[orderId].status);
     }
 
+    /**
+     * @notice updates the order status.
+     * @param orderId the order id.
+     * @param status the order status.
+     * @dev can be called by either the owner or the store manager.
+     * @dev called by store manager when the order is fulfilled via automation.
+     */
     function updateOrderStatus(bytes32 orderId, Status status) external onlyAdmin {
         require(orders[orderId].active, "Store: order does not exist");
         orders[orderId].status = status;
@@ -117,5 +138,9 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
 
     function setSubscriptionId(uint64 subId) public onlyOwner {
         subscriptionId = subId;
+    }
+
+    function getAutomationInterval() external view returns (uint96) {
+        return automationCheckInterval;
     }
 }
