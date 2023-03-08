@@ -9,9 +9,21 @@ interface IStoreFactory {
     error InstanceDoesNotExist();
     error ZeroAddress();
 
-    function createStore(address admin, bytes calldata companyName, uint64 subId) external returns (address);
-    function updateBeaconInstance(address newBlueprint, string calldata updatedVersion) external;
+    function createStore(
+        address admin,
+        bytes calldata companyName,
+        uint64 subId,
+        uint96 automationInterval
+    ) external returns (address);
+
+    function updateBeaconInstance(
+        address newBlueprint,
+        string calldata updatedVersion
+    ) external;
+
     function getInstance(address instanceOwner) external view returns (address);
+
     function getImplementation() external view returns (address);
+
     function getCurrentVersion() external view returns (string memory);
 }

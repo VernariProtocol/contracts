@@ -7,4 +7,8 @@ interface IStoreManager {
     function registerOrder(bytes32 orderId, bytes memory company) external;
 
     function addCompany(address vault) external;
+
+    function depositOrderAmount(bytes memory company) external payable;
+
+    function getVault() external view returns (address);
 }
