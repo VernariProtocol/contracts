@@ -9,12 +9,21 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IStore} from "./interfaces/IStore.sol";
 import {IStoreManager} from "./interfaces/IStoreManager.sol";
+import {IVault} from "./interfaces/IVault.sol";
 
-contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, OwnableUpgradeable {
+contract Store is
+    IStore,
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
+    OwnableUpgradeable
+{
     using SafeERC20 for IERC20Metadata;
 
     IStoreManager public storeManager;
-    bytes32 internal companyName;
+    bytes internal companyName;
+    uint64 internal subscriptionId;
+    uint96 automationCheckInterval;
     mapping(bytes32 => Order) internal orders;
 
     event OrderCreated(bytes32 indexed orderNumber, uint256 amount);
@@ -22,45 +31,77 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
 
     modifier onlyAdmin() {
         require(
-            msg.sender == address(storeManager) || msg.sender == owner(), "Store: only an admin can call this function"
+            msg.sender == address(storeManager) || msg.sender == owner(),
+            "Store: only an admin can call this function"
         );
         _;
     }
 
     /**
      * @param manager the vault manager contract address.
+     * @param owner the owner of the store.
+     * @param company the company name.
+     * @param subId the ChainLink Functions subscription id.
+     * @param automationInterval the interval in seconds to check for automation updates.
+     * @dev a Chainlink sub ID will need to be set up prior to initializing the contract.
      */
-    function initialize(address manager, address owner, bytes32 company) public initializer {
-        require(manager != address(0), "Store: Store manager cannot be zero address");
+    function initialize(
+        address manager,
+        address owner,
+        bytes memory company,
+        uint64 subId,
+        uint96 automationInterval
+    ) public initializer {
+        require(
+            owner != address(0),
+            "Store: Store owner cannot be zero address"
+        );
+        require(
+            manager != address(0),
+            "Store: Store manager cannot be zero address"
+        );
+        require(subId != 0, "Store: subscription id cannot be zero");
         __Ownable_init();
         __Pausable_init();
         setManager(manager);
+        setSubscriptionId(subId);
         transferOwnership(owner);
         companyName = company;
+        automationCheckInterval = automationInterval;
     }
 
     function version() public pure returns (string memory) {
         return "v0.0.1";
     }
 
-    function addOrder(bytes32 orderNumber, uint256 amount, bytes32 company) external payable override {
+    /**
+     * @notice adds new order to store and locks the amount sent into the vault.
+     * @param orderNumber the order ID from internal business
+     * @param amount the amount of the order.
+     */
+    function addOrder(
+        bytes32 orderNumber,
+        uint256 amount
+    ) external payable override {
         require(!orders[orderNumber].active, "Store: order already exists");
         require(msg.value >= amount, "Store: not enough sent");
         bytes32 orderId = keccak256(abi.encodePacked(orderNumber));
         orders[orderNumber] = Order({
             Id: orderId,
             trackingNumber: "",
-            company: "",
-            status: Status.Pending,
+            company: string(companyName),
+            status: Status.PENDING,
             lastUpdate: block.timestamp,
             lastPrice: 0,
             lastDepth: 0,
             lastLimit: 0,
             lastQueue: 0,
             active: true,
-            notes: new bytes[](0)
+            notes: new bytes[](0),
+            lastAutomationCheck: 0
         });
-        storeManager.registerOrder(orderId, company);
+        storeManager.registerOrder(orderId, companyName);
+        storeManager.depositOrderAmount{value: msg.value}(companyName);
         emit OrderCreated(orderNumber, msg.value);
     }
 
@@ -68,19 +109,38 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
      * ADMIN **********
      */
 
-    function updateOrder(bytes32 orderId, string memory trackingNumber, string memory shippingCompany)
-        external
-        onlyOwner
-    {
+    /**
+     * @notice updates the order tracking number and shipping company.
+     * @param orderId the order id.
+     * @param trackingNumber the tracking number.
+     * @param shippingCompany the shipping company.
+     * @dev can only be called by the owner (company).
+     * @dev called by store owner when the order is shipped.
+     */
+    function updateOrder(
+        bytes32 orderId,
+        string memory trackingNumber,
+        string memory shippingCompany
+    ) external onlyOwner {
         require(orders[orderId].active, "Store: order does not exist");
         orders[orderId].trackingNumber = trackingNumber;
         orders[orderId].company = shippingCompany;
-        orders[orderId].status = Status.Shipped;
+        orders[orderId].status = Status.SHIPPED;
         orders[orderId].lastUpdate = block.timestamp;
         emit OrderUpdated(orderId, orders[orderId].status);
     }
 
-    function updateOrderStatus(bytes32 orderId, Status status) external onlyAdmin {
+    /**
+     * @notice updates the order status.
+     * @param orderId the order id.
+     * @param status the order status.
+     * @dev can be called by either the owner or the store manager.
+     * @dev called by store manager when the order is fulfilled via automation.
+     */
+    function updateOrderStatus(
+        bytes32 orderId,
+        Status status
+    ) external onlyAdmin {
         require(orders[orderId].active, "Store: order does not exist");
         orders[orderId].status = status;
         orders[orderId].lastUpdate = block.timestamp;
@@ -91,8 +151,12 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         return orders[orderId];
     }
 
-    function getCompanyName() external view returns (bytes32) {
+    function getCompanyName() external view returns (bytes memory) {
         return companyName;
+    }
+
+    function getSubscriptionId() external view onlyAdmin returns (uint64) {
+        return subscriptionId;
     }
 
     function pause() external onlyOwner {
@@ -105,5 +169,20 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
 
     function setManager(address manager) public onlyOwner {
         storeManager = IStoreManager(manager);
+    }
+
+    function setSubscriptionId(uint64 subId) public onlyOwner {
+        subscriptionId = subId;
+    }
+
+    function getAutomationInterval() external view returns (uint96) {
+        return automationCheckInterval;
+    }
+
+    /**
+     * @notice the amount available to withdraw from finished orders.
+     */
+    function getWithdrawableAmount() external view returns (uint256) {
+        return IVault(storeManager.getVault()).withdrawableAmount();
     }
 }
