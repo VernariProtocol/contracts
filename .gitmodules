@@ -10,3 +10,7 @@
 	path = lib/openzeppelin-contracts-upgradeable
 	url = https://github.com/Openzeppelin/openzeppelin-contracts-upgradeable
 	branch = v4.8.2
+[submodule "lib/chainlink"]
+	path = lib/chainlink
+	url = https://github.com/smartcontractkit/chainlink
+	branch = v1.12.0
