@@ -47,11 +47,7 @@ contract StoreManager is
     mapping(bytes32 => bytes) internal companyRequests;
 
     event OCRResponse(bytes32 indexed requestId, bytes result, bytes err);
-    event FullfillmentError(
-        bytes32 indexed requestId,
-        bytes err,
-        bytes company
-    );
+    event FullfillmentError(bytes32 indexed requestId, bytes err, bytes company);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(address oracle) FunctionsClient(oracle) initializer {}
@@ -71,10 +67,7 @@ contract StoreManager is
         return "0.0.1";
     }
 
-    function registerOrder(
-        bytes32 orderId,
-        bytes memory company
-    ) external override nonReentrant whenNotPaused {
+    function registerOrder(bytes32 orderId, bytes memory company) external override nonReentrant whenNotPaused {
         _addToQueue(orderId, company);
     }
 
@@ -85,52 +78,27 @@ contract StoreManager is
         bytes memory company
     ) internal {
         Functions.Request memory req;
-        req.initializeRequest(
-            Functions.Location.Inline,
-            Functions.CodeLanguage.JavaScript,
-            string(lambdaFunction)
-        );
+        req.initializeRequest(Functions.Location.Inline, Functions.CodeLanguage.JavaScript, string(lambdaFunction));
         req.addInlineSecrets(lambdaSecrets);
-        string[4] memory setter = [
-            trackingNumber,
-            shippingCompany,
-            string(abi.encodePacked(orderId)),
-            string(company)
-        ];
+        string[4] memory setter = [trackingNumber, shippingCompany, string(abi.encodePacked(orderId)), string(company)];
         string[] memory args = new string[](setter.length);
         for (uint256 i = 0; i < setter.length; i++) {
             args[i] = setter[i];
         }
         req.addArgs(args);
 
-        bytes32 assignedReqID = sendRequest(
-            req,
-            IStore(stores[company]).getSubscriptionId(),
-            gasLimit,
-            tx.gasprice
-        );
+        bytes32 assignedReqID = sendRequest(req, IStore(stores[company]).getSubscriptionId(), gasLimit, tx.gasprice);
         companyRequests[assignedReqID] = company;
     }
 
-    function fulfillRequest(
-        bytes32 requestId,
-        bytes memory response,
-        bytes memory err
-    ) internal override {
+    function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         if (response.length != 0) {
-            (uint8 status, bytes32 orderNumber, bytes memory company) = abi
-                .decode(response, (uint8, bytes32, bytes));
+            (uint8 status, bytes32 orderNumber, bytes memory company) = abi.decode(response, (uint8, bytes32, bytes));
             if (status == uint8(IStore.Status.DELIVERED)) {
                 _removeFromQueue(orderNumber, company);
-                _updateOrderStatus(
-                    orderNumber,
-                    company,
-                    IStore.Status.DELIVERED
-                );
+                _updateOrderStatus(orderNumber, company, IStore.Status.DELIVERED);
             } else {
-                IStore(stores[company])
-                    .getOrder(orderNumber)
-                    .lastAutomationCheck = block.timestamp;
+                IStore(stores[company]).getOrder(orderNumber).lastAutomationCheck = block.timestamp;
             }
         } else {
             latestError = err;
@@ -140,28 +108,20 @@ contract StoreManager is
         emit OCRResponse(requestId, response, err);
     }
 
-    function checkUpkeep(
-        bytes calldata checkData
-    )
+    function checkUpkeep(bytes calldata checkData)
         external
         view
         override
         returns (bool upkeepNeeded, bytes memory performData)
     {
         bytes memory company = abi.decode(checkData, (bytes));
-        require(
-            activeCompanies[company],
-            "StoreManager: company must be active"
-        );
+        require(activeCompanies[company], "StoreManager: company must be active");
         for (uint256 i = 0; i < companyQueue[company].length(); i++) {
             bytes32 orderId = companyQueue[company].at(i);
-            IStore.Order memory order = IStore(stores[company]).getOrder(
-                orderId
-            );
+            IStore.Order memory order = IStore(stores[company]).getOrder(orderId);
             if (
-                order.status == IStore.Status.SHIPPED &&
-                block.timestamp - order.lastAutomationCheck >
-                IStore(stores[company]).getAutomationInterval()
+                order.status == IStore.Status.SHIPPED
+                    && block.timestamp - order.lastAutomationCheck > IStore(stores[company]).getAutomationInterval()
             ) {
                 upkeepNeeded = true;
                 break;
@@ -171,30 +131,17 @@ contract StoreManager is
         return (upkeepNeeded, performData);
     }
 
-    function performUpkeep(
-        bytes calldata performData
-    ) external override whenNotPaused nonReentrant {
+    function performUpkeep(bytes calldata performData) external override whenNotPaused nonReentrant {
         bytes memory company = abi.decode(performData, (bytes));
-        require(
-            activeCompanies[company],
-            "StoreManager: company must be active"
-        );
+        require(activeCompanies[company], "StoreManager: company must be active");
         for (uint256 i = 0; i < companyQueue[company].length(); i++) {
             bytes32 orderId = companyQueue[company].at(i);
-            IStore.Order memory order = IStore(stores[company]).getOrder(
-                orderId
-            );
+            IStore.Order memory order = IStore(stores[company]).getOrder(orderId);
             if (
-                order.status == IStore.Status.SHIPPED &&
-                block.timestamp - order.lastAutomationCheck >
-                IStore(stores[company]).getAutomationInterval()
+                order.status == IStore.Status.SHIPPED
+                    && block.timestamp - order.lastAutomationCheck > IStore(stores[company]).getAutomationInterval()
             ) {
-                requestTracking(
-                    order.trackingNumber,
-                    order.company,
-                    orderId,
-                    company
-                );
+                requestTracking(order.trackingNumber, order.company, orderId, company);
             }
         }
     }
@@ -207,11 +154,7 @@ contract StoreManager is
 
     // Internal functions ------------------------------------------------------
 
-    function _updateOrderStatus(
-        bytes32 orderId,
-        bytes memory company,
-        IStore.Status status
-    ) internal {
+    function _updateOrderStatus(bytes32 orderId, bytes memory company, IStore.Status status) internal {
         IStore(stores[company]).updateOrderStatus(orderId, status);
     }
 
@@ -220,10 +163,7 @@ contract StoreManager is
     }
 
     function _addToQueue(bytes32 orderId, bytes memory company) internal {
-        require(
-            activeCompanies[company],
-            "StoreManager: company must be active"
-        );
+        require(activeCompanies[company], "StoreManager: company must be active");
         companyQueue[company].add(orderId);
     }
 
@@ -235,19 +175,10 @@ contract StoreManager is
      * @dev The company must not be active.
      */
     function addCompany(address store) external override onlyOwner {
-        require(
-            store != address(0),
-            "StoreManager: vault cannot be zero address"
-        );
+        require(store != address(0), "StoreManager: store cannot be zero address");
         bytes memory company = IStore(store).getCompanyName();
-        require(
-            !activeCompanies[company],
-            "StoreManager: company must not be active"
-        );
-        require(
-            stores[company] == address(0),
-            "StoreManager: company must not have a store"
-        );
+        require(!activeCompanies[company], "StoreManager: company must not be active");
+        require(stores[company] == address(0), "StoreManager: company must not have a store");
         stores[company] = store;
         activeCompanies[company] = true;
     }
@@ -256,9 +187,7 @@ contract StoreManager is
         jobPayment = payment;
     }
 
-    function getQueueLength(
-        bytes memory company
-    ) external view onlyOwner returns (uint256) {
+    function getQueueLength(bytes memory company) external view onlyOwner returns (uint256) {
         return companyQueue[company].length();
     }
 
