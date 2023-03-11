@@ -3,24 +3,17 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
-import {StoreFactory} from "../contracts/StoreFactory.sol";
+import {Store} from "../contracts/Store.sol";
 
-contract StoreFactoryScript is Script {
+contract StoreScript is Script {
     using stdJson for string;
 
-    StoreFactory storeFactory;
+    Store blueprint;
     uint256 deployerPrivateKey;
     Config config;
 
-    /**
-     *
-     * @notice blueprint is the address of the deployed Store implementation
-     */
-
     struct Config {
-        address blueprint;
-        address storeManager;
-        string version;
+        address oracle;
     }
 
     function configureNetwork(string memory input) internal view returns (Config memory) {
@@ -33,7 +26,7 @@ contract StoreFactoryScript is Script {
     }
 
     function run() public {
-        config = configureNetwork("factory-config");
+        config = configureNetwork("config");
         if (block.chainid == 31337) {
             deployerPrivateKey = vm.envUint("ANVIL_PRIVATE_KEY");
         } else {
@@ -42,12 +35,7 @@ contract StoreFactoryScript is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        storeFactory = new StoreFactory(
-            config.blueprint,
-            config.version,
-            config.storeManager
-
-        );
+        blueprint = new Store();
 
         vm.stopBroadcast();
     }

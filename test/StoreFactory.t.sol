@@ -8,6 +8,7 @@ import "../contracts/StoreFactory.sol";
 import "../contracts/StoreManager.sol";
 import "../contracts/Store.sol";
 import {Vault} from "../contracts/Vault.sol";
+import {StoreV2} from "../contracts/mock/StoreV2.sol";
 
 contract StoreManagerTest is Test {
     UUPSProxy proxy;
@@ -16,7 +17,7 @@ contract StoreManagerTest is Test {
     StoreFactory factory;
     StoreManager proxyManager;
     Store blueprintv1;
-    Store blueprintv2;
+    StoreV2 blueprintv2;
     address oracle;
     Vault vault;
     Store impl1;
@@ -70,9 +71,9 @@ contract StoreManagerTest is Test {
         assertEq(store.getCompanyName(), "the store");
         assertEq(store.version(), "v0.0.1");
 
-        blueprintv2 = new Store();
+        blueprintv2 = new StoreV2();
         factory.updateBeaconInstance(address(blueprintv2), "v0.0.2");
-        assertEq(factory.getCurrentVersion(), "v0.0.2");
+        assertEq(store.version(), "v0.0.2");
         vm.stopPrank();
     }
 }
