@@ -11,19 +11,14 @@ import {IStore} from "./interfaces/IStore.sol";
 import {IStoreManager} from "./interfaces/IStoreManager.sol";
 import {IVault} from "./interfaces/IVault.sol";
 
-contract Store is
-    IStore,
-    Initializable,
-    ReentrancyGuardUpgradeable,
-    PausableUpgradeable,
-    OwnableUpgradeable
-{
+contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, OwnableUpgradeable {
     using SafeERC20 for IERC20Metadata;
 
     IStoreManager public storeManager;
     bytes internal companyName;
     uint64 internal subscriptionId;
     uint96 automationCheckInterval;
+    mapping(address => bool) internal whitelist;
     mapping(bytes32 => Order) internal orders;
 
     event OrderCreated(bytes32 indexed orderNumber, uint256 amount);
@@ -31,7 +26,7 @@ contract Store is
 
     modifier onlyAdmin() {
         require(
-            msg.sender == address(storeManager) || msg.sender == owner(),
+            msg.sender == address(storeManager) || msg.sender == owner() || whitelist[msg.sender],
             "Store: only an admin can call this function"
         );
         _;
@@ -45,21 +40,12 @@ contract Store is
      * @param automationInterval the interval in seconds to check for automation updates.
      * @dev a Chainlink sub ID will need to be set up prior to initializing the contract.
      */
-    function initialize(
-        address manager,
-        address owner,
-        bytes memory company,
-        uint64 subId,
-        uint96 automationInterval
-    ) public initializer {
-        require(
-            owner != address(0),
-            "Store: Store owner cannot be zero address"
-        );
-        require(
-            manager != address(0),
-            "Store: Store manager cannot be zero address"
-        );
+    function initialize(address manager, address owner, bytes memory company, uint64 subId, uint96 automationInterval)
+        public
+        initializer
+    {
+        require(owner != address(0), "Store: Store owner cannot be zero address");
+        require(manager != address(0), "Store: Store manager cannot be zero address");
         require(subId != 0, "Store: subscription id cannot be zero");
         __Ownable_init();
         __Pausable_init();
@@ -79,10 +65,7 @@ contract Store is
      * @param orderNumber the order ID from internal business
      * @param amount the amount of the order.
      */
-    function addOrder(
-        bytes32 orderNumber,
-        uint256 amount
-    ) external payable override {
+    function addOrder(bytes32 orderNumber, uint256 amount) external payable override {
         require(!orders[orderNumber].active, "Store: order already exists");
         require(msg.value >= amount, "Store: not enough sent");
         bytes32 orderId = keccak256(abi.encodePacked(orderNumber));
@@ -117,11 +100,10 @@ contract Store is
      * @dev can only be called by the owner (company).
      * @dev called by store owner when the order is shipped.
      */
-    function updateOrder(
-        bytes32 orderId,
-        string memory trackingNumber,
-        string memory shippingCompany
-    ) external onlyOwner {
+    function updateOrder(bytes32 orderId, string memory trackingNumber, string memory shippingCompany)
+        external
+        onlyOwner
+    {
         require(orders[orderId].active, "Store: order does not exist");
         orders[orderId].trackingNumber = trackingNumber;
         orders[orderId].company = shippingCompany;
@@ -137,10 +119,7 @@ contract Store is
      * @dev can be called by either the owner or the store manager.
      * @dev called by store manager when the order is fulfilled via automation.
      */
-    function updateOrderStatus(
-        bytes32 orderId,
-        Status status
-    ) external onlyAdmin {
+    function updateOrderStatus(bytes32 orderId, Status status) external onlyAdmin {
         require(orders[orderId].active, "Store: order does not exist");
         orders[orderId].status = status;
         orders[orderId].lastUpdate = block.timestamp;
@@ -184,5 +163,13 @@ contract Store is
      */
     function getWithdrawableAmount() external view returns (uint256) {
         return IVault(storeManager.getVault()).withdrawableAmount();
+    }
+
+    function addWhiteListedAddress(address addr) external onlyOwner {
+        whitelist[addr] = true;
+    }
+
+    function removeWhiteListedAddress(address addr) external onlyOwner {
+        whitelist[addr] = false;
     }
 }

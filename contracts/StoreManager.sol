@@ -10,10 +10,9 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {AutomationCompatibleInterface} from "@chainlink/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
-import {FunctionsClient} from "./FunctionsClient.sol";
+import {FunctionsClient, Functions} from "@chainlink/src/v0.8/dev/functions/FunctionsClient.sol";
 import {IStoreManager} from "./interfaces/IStoreManager.sol";
 import {IStore} from "./interfaces/IStore.sol";
-import {Functions} from "./lib/Functions.sol";
 import {IVault} from "./interfaces/IVault.sol";
 
 contract StoreManager is
@@ -78,7 +77,7 @@ contract StoreManager is
         bytes memory company
     ) internal {
         Functions.Request memory req;
-        req.initializeRequest(Functions.Location.Inline, Functions.CodeLanguage.JavaScript, string(lambdaFunction));
+        req.initializeRequestForInlineJavaScript(string(lambdaFunction));
         req.addInlineSecrets(lambdaSecrets);
         string[4] memory setter = [trackingNumber, shippingCompany, string(abi.encodePacked(orderId)), string(company)];
         string[] memory args = new string[](setter.length);
