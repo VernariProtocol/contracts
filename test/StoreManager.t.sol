@@ -7,6 +7,7 @@ import "../contracts/proxy/UUPSProxy.sol";
 import "../contracts/StoreManager.sol";
 import "../contracts/Store.sol";
 import {Vault} from "../contracts/Vault.sol";
+import {StoreManagerV2} from "../contracts/mock/StoreManagerV2.sol";
 
 contract StoreManagerTest is Test {
     UUPSProxy proxy;
@@ -18,6 +19,7 @@ contract StoreManagerTest is Test {
     address oracle;
     Vault vault;
     Store store1;
+    StoreManagerV2 implV2;
 
     function setUp() public {
         admin = makeAddr("admin");
@@ -25,7 +27,7 @@ contract StoreManagerTest is Test {
         store1Owner = makeAddr("store1Owner");
         vm.startPrank(admin);
         vault = new Vault();
-        // deploy the implementation contract
+        // deploy the implementation contract and remember to initialize it
         StoreManager impl = new StoreManager(oracle);
         proxy = new UUPSProxy(
             address(impl),
@@ -48,16 +50,23 @@ contract StoreManagerTest is Test {
         vm.stopPrank();
     }
 
-    // function test_UpgradeContract() public {
-    //     // proxy is the proxy contract that is called
-    //     // deploy the new implementation contract
-    //     StoreManager impl2 = new StoreManager();
-    //     // call the upgradeTo function on the proxy with new implementation address
-    //     wrappedV1.upgradeTo(address(impl2));
-    //     StoreManager wrappedV2 = StoreManager(address(proxy));
-    //     wrappedV2.decrement();
-    //     assert(wrappedV2.number() == 41);
-    // }
+    function test_upgrade_upgradeStoreManager() public {
+        vm.startPrank(admin);
+
+        implV2 = new StoreManagerV2(oracle);
+        proxyManager.upgradeTo(address(implV2));
+        assertEq(proxyManager.version(), "v0.0.2");
+        vm.stopPrank();
+    }
+
+    function testRevert_upgrade_upgradeFailsWhenCalledByRandomAddress() public {
+        vm.startPrank(store1Owner);
+
+        implV2 = new StoreManagerV2(oracle);
+        vm.expectRevert("Ownable: caller is not the owner");
+        proxyManager.upgradeTo(address(implV2));
+        vm.stopPrank();
+    }
 
     function test_getChainlinkOracleAddress_ReturnsCorrectAddress() public {
         vm.prank(admin);

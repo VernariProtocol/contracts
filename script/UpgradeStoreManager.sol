@@ -4,19 +4,16 @@ pragma solidity ^0.8.13;
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 import {StoreManager} from "../contracts/StoreManager.sol";
-import {UUPSProxy} from "../contracts/proxy/UUPSProxy.sol";
-import {Vault} from "../contracts/Vault.sol";
 
-contract StoreManagerScript is Script {
+contract UpgradeStoreManager is Script {
     using stdJson for string;
 
-    StoreManager impl;
-    Vault vault;
-    UUPSProxy proxy;
-    uint256 deployerPrivateKey;
+    StoreManager newVersion;
     Config config;
+    uint256 deployerPrivateKey;
 
     struct Config {
+        address manager;
         address oracle;
     }
 
@@ -30,25 +27,16 @@ contract StoreManagerScript is Script {
     }
 
     function run() public {
-        config = configureNetwork("config");
+        config = configureNetwork("upgrade-manager-config");
         if (block.chainid == 31337) {
             deployerPrivateKey = vm.envUint("ANVIL_PRIVATE_KEY");
         } else {
             deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         }
-
         vm.startBroadcast(deployerPrivateKey);
+        newVersion = new StoreManager(config.oracle);
+        StoreManager(config.manager).upgradeTo(address(newVersion));
 
-        impl = new StoreManager(config.oracle);
-        vault = new Vault();
-        proxy = new UUPSProxy(
-            address(impl),
-            abi.encodeWithSignature(
-                "initialize(address,address)",
-                config.oracle,
-                address(vault)
-            )
-        );
         vm.stopBroadcast();
     }
 }

@@ -11,11 +11,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {AutomationCompatibleInterface} from "@chainlink/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 import {FunctionsClient, Functions} from "@chainlink/src/v0.8/dev/functions/FunctionsClient.sol";
-import {IStoreManager} from "./interfaces/IStoreManager.sol";
-import {IStore} from "./interfaces/IStore.sol";
-import {IVault} from "./interfaces/IVault.sol";
+import {IStoreManager} from "../interfaces/IStoreManager.sol";
+import {IStore} from "../interfaces/IStore.sol";
+import {IVault} from "../interfaces/IVault.sol";
 
-contract StoreManager is
+contract StoreManagerV2 is
     IStoreManager,
     FunctionsClient,
     Initializable,
@@ -63,7 +63,7 @@ contract StoreManager is
     }
 
     function version() public pure returns (string memory) {
-        return "v0.0.1";
+        return "v0.0.2";
     }
 
     function registerOrder(bytes32 orderId, bytes memory company) external override nonReentrant whenNotPaused {
