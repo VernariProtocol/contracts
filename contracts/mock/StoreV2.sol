@@ -7,11 +7,11 @@ import {PausableUpgradeable} from "@openzeppelin-upgrades/contracts/security/Pau
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IStore} from "./interfaces/IStore.sol";
-import {IStoreManager} from "./interfaces/IStoreManager.sol";
-import {IVault} from "./interfaces/IVault.sol";
+import {IStore} from "../interfaces/IStore.sol";
+import {IStoreManager} from "../interfaces/IStoreManager.sol";
+import {IVault} from "../interfaces/IVault.sol";
 
-contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, OwnableUpgradeable {
+contract StoreV2 is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, OwnableUpgradeable {
     using SafeERC20 for IERC20Metadata;
 
     IStoreManager public storeManager;
@@ -57,7 +57,7 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     }
 
     function version() public pure returns (string memory) {
-        return "v0.0.1";
+        return "v0.0.2";
     }
 
     /**
