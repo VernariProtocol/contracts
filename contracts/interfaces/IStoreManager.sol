@@ -11,4 +11,6 @@ interface IStoreManager {
     function depositOrderAmount(bytes memory company) external payable;
 
     function getVault() external view returns (address);
+
+    function withdrawVaultAmount(uint256 amount) external;
 }

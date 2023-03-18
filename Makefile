@@ -9,6 +9,19 @@ clean:
 tests:
 	forge test -vvvv
 
-# run anvil in another terminal
-script-local:
-	forge script script/Counter.s.sol:CounterScript --fork-url http://localhost:8545 --private-key ${PRIVATE_LOCAL_KEY} --broadcast -vvvv
+# Scripts
+
+deploy-blueprint:
+	forge script script/1.Blueprint.s.sol:StoreScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv
+
+deploy-manager:
+	forge script script/2.StoreManager.s.sol:StoreManagerScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv
+
+deploy-factory:
+	forge script script/3.StoreFactory.s.sol:StoreFactoryScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv
+
+set-lambda:
+	forge script script/SetLambda.s.sol:SetLambdaScript --rpc-url ${RPC_URL} --broadcast --verify -vvvv
+
+store:
+	forge script script/Store.s.sol:StoreScript --rpc-url ${RPC_URL} --broadcast --verify -vvvv

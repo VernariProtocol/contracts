@@ -5,5 +5,8 @@ libs = ['lib']
 remappings = ['@openzeppelin=lib/openzeppelin-contracts', '@openzeppelin-upgrades=lib/openzeppelin-contracts-upgradeable', '@chainlink=lib/chainlink/contracts']
 optimizer = true
 optimizer_runs = 2_000
+fs_permissions = [{ access = "read", path = "./"}]
 
-# See more config options https://github.com/foundry-rs/foundry/tree/master/config
+
+[rpc_endpoints]
+mumbai = "${MUMBAI_RPC_URL}"

@@ -31,9 +31,7 @@ contract StoreManagerV2 is
 
     IVault i_vault;
 
-    bytes32 jobSpec;
     uint256 interval;
-    uint256 jobPayment;
 
     bytes internal latestError;
     bytes internal lambdaFunction;
@@ -47,13 +45,13 @@ contract StoreManagerV2 is
 
     event OCRResponse(bytes32 indexed requestId, bytes result, bytes err);
     event FullfillmentError(bytes32 indexed requestId, bytes err, bytes company);
+    event StoreAdded(bytes indexed company, address indexed store);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(address oracle) FunctionsClient(oracle) initializer {}
+    constructor(address oracle) FunctionsClient(oracle) {
+        _disableInitializers();
+    }
 
-    /**
-     * @notice Initialize the contract after it has been proxied
-     */
     function initialize(address oracle, address vault) public initializer {
         __Ownable_init();
         __Pausable_init();
@@ -92,12 +90,12 @@ contract StoreManagerV2 is
 
     function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         if (response.length != 0) {
-            (uint8 status, bytes32 orderNumber, bytes memory company) = abi.decode(response, (uint8, bytes32, bytes));
+            (uint8 status, bytes32 orderNumber, string memory company) = abi.decode(response, (uint8, bytes32, string));
             if (status == uint8(IStore.Status.DELIVERED)) {
-                _removeFromQueue(orderNumber, company);
-                _updateOrderStatus(orderNumber, company, IStore.Status.DELIVERED);
+                _removeFromQueue(orderNumber, bytes(company));
+                _updateOrderStatus(orderNumber, bytes(company), IStore.Status.DELIVERED);
             } else {
-                IStore(stores[company]).getOrder(orderNumber).lastAutomationCheck = block.timestamp;
+                IStore(stores[bytes(company)]).getOrder(orderNumber).lastAutomationCheck = block.timestamp;
             }
         } else {
             latestError = err;
@@ -113,7 +111,7 @@ contract StoreManagerV2 is
         override
         returns (bool upkeepNeeded, bytes memory performData)
     {
-        bytes memory company = abi.decode(checkData, (bytes));
+        bytes memory company = checkData;
         require(activeCompanies[company], "StoreManager: company must be active");
         for (uint256 i = 0; i < companyQueue[company].length(); i++) {
             bytes32 orderId = companyQueue[company].at(i);
@@ -131,7 +129,7 @@ contract StoreManagerV2 is
     }
 
     function performUpkeep(bytes calldata performData) external override whenNotPaused nonReentrant {
-        bytes memory company = abi.decode(performData, (bytes));
+        bytes memory company = performData;
         require(activeCompanies[company], "StoreManager: company must be active");
         for (uint256 i = 0; i < companyQueue[company].length(); i++) {
             bytes32 orderId = companyQueue[company].at(i);
@@ -145,10 +143,19 @@ contract StoreManagerV2 is
         }
     }
 
+    /**
+     * @notice receive funds from store to send to vault.
+     * @param company the company name.
+     * @dev The company must not be active.
+     */
     function depositOrderAmount(bytes memory company) external payable {
         address store = stores[company];
         require(store != address(0), "StoreManager: store not found");
         i_vault.deposit{value: msg.value}(store);
+    }
+
+    function withdrawVaultAmount(uint256 amount) external {
+        i_vault.withdraw(amount, payable(msg.sender));
     }
 
     // Internal functions ------------------------------------------------------
@@ -180,10 +187,7 @@ contract StoreManagerV2 is
         require(stores[company] == address(0), "StoreManager: company must not have a store");
         stores[company] = store;
         activeCompanies[company] = true;
-    }
-
-    function setPayment(uint256 payment) public onlyOwner {
-        jobPayment = payment;
+        emit StoreAdded(company, store);
     }
 
     function getQueueLength(bytes memory company) external view onlyOwner returns (uint256) {

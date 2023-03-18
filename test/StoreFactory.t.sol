@@ -56,7 +56,7 @@ contract StoreManagerTest is Test {
         vm.startPrank(admin);
         address storeAddress = factory.createStore(store1Owner, bytes("the store"), 1, (60 * 60 * 6));
         vm.stopPrank();
-        Store store = Store(storeAddress);
+        Store store = Store(payable(storeAddress));
         assertEq(store.owner(), store1Owner);
         assertEq(store.getCompanyName(), "the store");
         assertEq(store.version(), "v0.0.1");
@@ -66,7 +66,7 @@ contract StoreManagerTest is Test {
         vm.startPrank(admin);
         address storeAddress = factory.createStore(store1Owner, bytes("the store"), 1, (60 * 60 * 6));
 
-        Store store = Store(storeAddress);
+        Store store = Store(payable(storeAddress));
         assertEq(store.owner(), store1Owner);
         assertEq(store.getCompanyName(), "the store");
         assertEq(store.version(), "v0.0.1");
