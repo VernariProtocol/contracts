@@ -81,7 +81,7 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
             lastQueue: 0,
             active: true,
             notes: new bytes[](0),
-            lastAutomationCheck: 0
+            lastAutomationCheck: block.timestamp
         });
         storeManager.registerOrder(orderId, companyName);
         storeManager.depositOrderAmount{value: msg.value}(companyName);
@@ -124,6 +124,10 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         orders[orderId].status = status;
         orders[orderId].lastUpdate = block.timestamp;
         emit OrderUpdated(orderId, orders[orderId].status);
+    }
+
+    function withdrawVaultFunds(uint256 amount) external onlyAdmin {
+        storeManager.withdrawVaultAmount(amount);
     }
 
     function getOrder(bytes32 orderId) external view returns (Order memory) {
@@ -172,4 +176,12 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     function removeWhiteListedAddress(address addr) external onlyOwner {
         whitelist[addr] = false;
     }
+
+    function withdraw() external onlyOwner {
+        uint256 amount = address(this).balance;
+        require(amount > 0, "Store: no funds to withdraw");
+        payable(msg.sender).transfer(amount);
+    }
+
+    receive() external payable {}
 }

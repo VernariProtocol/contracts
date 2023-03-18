@@ -172,4 +172,10 @@ contract StoreV2 is IStore, Initializable, ReentrancyGuardUpgradeable, PausableU
     function removeWhiteListedAddress(address addr) external onlyOwner {
         whitelist[addr] = false;
     }
+
+    function withdraw() external onlyOwner {
+        uint256 amount = address(this).balance;
+        require(amount > 0, "Store: no funds to withdraw");
+        payable(msg.sender).transfer(amount);
+    }
 }

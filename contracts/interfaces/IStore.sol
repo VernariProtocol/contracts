@@ -41,4 +41,6 @@ interface IStore {
     function getSubscriptionId() external view returns (uint64);
 
     function getAutomationInterval() external view returns (uint96);
+
+    function withdraw() external;
 }

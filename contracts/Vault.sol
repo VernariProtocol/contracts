@@ -5,32 +5,41 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Vault is Ownable {
     address public manager;
-    mapping(address => uint256) public balances;
+    mapping(address => uint256) public lockedBalances;
+    mapping(address => uint256) public unlockedBalances;
 
     modifier onlyManager() {
-        require(msg.sender == manager, "only manager can call this function");
+        require(msg.sender == manager, "Vault: only manager can call this function");
         _;
     }
 
     constructor() {}
 
     function deposit(address account) external payable onlyManager {
-        balances[account] += msg.value;
+        lockedBalances[account] += msg.value;
     }
 
-    function withdraw(uint256 amount) public {
-        balances[msg.sender] -= amount;
+    function withdraw(uint256 amount, address payable account) external onlyManager {
+        require(amount <= unlockedBalances[account], "Vault: insufficient funds");
+        unlockedBalances[account] -= amount;
+        (bool sent,) = account.call{value: amount}("");
+        require(sent, "Failed to send Ether");
+    }
+
+    function updateBalance(address account, uint256 amount) external onlyManager {
+        unlockedBalances[account] += amount;
+        lockedBalances[account] -= amount;
     }
 
     function withdrawableAmount() external view returns (uint256) {
-        return balances[msg.sender];
+        return unlockedBalances[msg.sender];
     }
 
-    function getBalance(address account) public view returns (uint256) {
-        return balances[account];
+    function getLockedBalance(address account) external view returns (uint256) {
+        return lockedBalances[account];
     }
 
-    function setStoreManager(address managerAddress) public onlyOwner {
+    function setStoreManager(address managerAddress) external onlyOwner {
         manager = managerAddress;
     }
 }

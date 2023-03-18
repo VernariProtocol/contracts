@@ -30,7 +30,7 @@ contract StoreManagerScript is Script {
     }
 
     function run() public {
-        config = configureNetwork("config");
+        config = configureNetwork("manager-config");
         if (block.chainid == 31337) {
             deployerPrivateKey = vm.envUint("ANVIL_PRIVATE_KEY");
         } else {
@@ -49,6 +49,8 @@ contract StoreManagerScript is Script {
                 address(vault)
             )
         );
+        vault.setStoreManager(address(proxy));
+        console.log("StoreManager address: ", address(proxy));
         vm.stopBroadcast();
     }
 }

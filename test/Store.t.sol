@@ -57,7 +57,7 @@ contract StoreTest is Test {
         vm.prank(admin);
         assertEq(proxyManager.getQueueLength(bytes("the store")), 1);
         assertEq(address(vault).balance, 1 ether);
-        assertEq(vault.getBalance(address(store1)), 1 ether);
+        assertEq(vault.getLockedBalance(address(store1)), 1 ether);
     }
 
     function testRevert_addOrder_NotEnoughGasTokenSent() public {
@@ -91,7 +91,7 @@ contract StoreTest is Test {
         vm.prank(admin);
         assertEq(proxyManager.getQueueLength(bytes("the store")), 1);
         assertEq(address(vault).balance, 1 ether);
-        assertEq(vault.getBalance(address(store1)), 1 ether);
-        assertEq(store1.getWithdrawableAmount(), 1 ether);
+        assertEq(vault.getLockedBalance(address(store1)), 1 ether);
+        assertEq(store1.getWithdrawableAmount(), 0);
     }
 }
