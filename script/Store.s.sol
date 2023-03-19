@@ -18,7 +18,8 @@ contract StoreScript is Script {
             deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         }
         vm.startBroadcast(deployerPrivateKey);
-        store = Store(payable(0x728139672E28f7d861fbb6230e36642Cde9050D4));
+        store = Store(payable(0xC1dca3133E8e23a5522099d4cCe0e2bc21ef5C19));
+        // store.addOrder{value: 0.01 ether}(keccak256(abi.encodePacked("one")), 0.01 ether);
         store.updateOrder(keccak256(abi.encodePacked("one")), "SHIPPO_TRANSIT", "shippo");
 
         vm.stopBroadcast();

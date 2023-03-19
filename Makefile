@@ -23,5 +23,11 @@ deploy-factory:
 set-lambda:
 	forge script script/SetLambda.s.sol:SetLambdaScript --rpc-url ${RPC_URL} --broadcast --verify -vvvv
 
+deploy-new-store:
+	forge script script/CreateStore.s.sol:CreateStoreScript --rpc-url ${RPC_URL} --broadcast --verify -vvvv
+
 store:
 	forge script script/Store.s.sol:StoreScript --rpc-url ${RPC_URL} --broadcast --verify -vvvv
+
+upgrade-manager:
+	forge script script/UpgradeStoreManager.s.sol:UpgradeStoreManagerScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv

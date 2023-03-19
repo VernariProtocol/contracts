@@ -15,7 +15,7 @@ contract NetworkForkTest is Test {
     function setUp() public {
         network = vm.createSelectFork(vm.rpcUrl("mumbai"));
         admin = makeAddr("admin");
-        store = Store(payable(0x728139672E28f7d861fbb6230e36642Cde9050D4));
+        store = Store(payable(0x8FC5e074e6F4faa87fc8B48558bbca468c34e793));
     }
 
     function testFork_storeVersion() public view {
@@ -26,5 +26,10 @@ contract NetworkForkTest is Test {
     function testFork_getWithdrawableAMount() public view {
         uint256 v = store.getWithdrawableAmount();
         console.log("name: ", v);
+    }
+
+    function testFork_getName() public view {
+        bytes memory v = store.getCompanyName();
+        console.log("name: ", string(v));
     }
 }

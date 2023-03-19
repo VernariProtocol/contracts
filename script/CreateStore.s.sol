@@ -3,18 +3,22 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
+import {StoreFactory} from "../contracts/StoreFactory.sol";
 import {StoreManager} from "../contracts/StoreManager.sol";
 
-contract UpgradeStoreManager is Script {
+contract CreateStoreScript is Script {
     using stdJson for string;
 
-    StoreManager newVersion;
-    Config config;
+    StoreFactory factory;
+    StoreManager manager;
     uint256 deployerPrivateKey;
+    Config config;
 
     struct Config {
+        address admin;
+        address factory;
         address manager;
-        address oracle;
+        uint64 subId;
     }
 
     function configureNetwork(string memory input) internal view returns (Config memory) {
@@ -27,15 +31,19 @@ contract UpgradeStoreManager is Script {
     }
 
     function run() public {
-        config = configureNetwork("upgrade-manager-config");
+        config = configureNetwork("address-config");
         if (block.chainid == 31337) {
             deployerPrivateKey = vm.envUint("ANVIL_PRIVATE_KEY");
         } else {
             deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         }
+
         vm.startBroadcast(deployerPrivateKey);
-        newVersion = new StoreManager(config.oracle);
-        StoreManager(config.manager).upgradeTo(address(newVersion));
+
+        factory = StoreFactory(config.factory);
+        manager = StoreManager(config.manager);
+        address newStore = factory.createStore(config.admin, bytes("company1"), config.subId, 180);
+        manager.addCompany(newStore);
 
         vm.stopBroadcast();
     }

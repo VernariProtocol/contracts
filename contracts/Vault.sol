@@ -26,13 +26,13 @@ contract Vault is Ownable {
         require(sent, "Failed to send Ether");
     }
 
-    function updateBalance(address account, uint256 amount) external onlyManager {
+    function unlockFunds(address account, uint256 amount) external onlyManager {
         unlockedBalances[account] += amount;
         lockedBalances[account] -= amount;
     }
 
-    function withdrawableAmount() external view returns (uint256) {
-        return unlockedBalances[msg.sender];
+    function withdrawableAmount(address account) external view returns (uint256) {
+        return unlockedBalances[account];
     }
 
     function getLockedBalance(address account) external view returns (uint256) {

@@ -2,14 +2,46 @@
 
 ## Deploy
 
-- Deploy Store Blueprint (make deploy-blueprint)
-- Deploy Store Manager (make deploy-manager)
-- Update config for factory
-- Deploy Factory (make deploy-factory)
-- Set store manager in Vault
-- set lambda in store manager (make set-lambda)
-- create/fund upkeep for store
-- create/fund/add consumer (consumer is manager) functions sub
+Deploy Store Blueprint
+
+```bash
+make deploy-blueprint
+```
+
+Deploy Store Manager
+
+```bash
+make deploy-manager
+```
+
+Update config for factory
+
+- blueprint
+- manager
+
+Deploy Factory
+
+```bash
+make deploy-factory
+```
+
+Set lambda in store manager
+
+```bash
+make set-lambda
+```
+
+create/fund upkeep for store (Per Store Owner)
+
+- https://automation.chain.link/mumbai
+
+create/fund/add consumer (consumer is manager) functions sub
+
+Create a new Store instance (Company)
+
+```bash
+make deploy-new-store
+```
 
 ## Store Manager
 

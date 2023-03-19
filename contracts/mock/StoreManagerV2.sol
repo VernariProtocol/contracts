@@ -14,6 +14,7 @@ import {FunctionsClient, Functions} from "@chainlink/src/v0.8/dev/functions/Func
 import {IStoreManager} from "../interfaces/IStoreManager.sol";
 import {IStore} from "../interfaces/IStore.sol";
 import {IVault} from "../interfaces/IVault.sol";
+import "forge-std/console.sol";
 
 contract StoreManagerV2 is
     IStoreManager,
@@ -30,8 +31,6 @@ contract StoreManagerV2 is
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     IVault i_vault;
-
-    uint256 interval;
 
     bytes internal latestError;
     bytes internal lambdaFunction;
@@ -52,12 +51,13 @@ contract StoreManagerV2 is
         _disableInitializers();
     }
 
-    function initialize(address oracle, address vault) public initializer {
+    function initialize(address oracle, address vault, uint32 gasCallback) public initializer {
         __Ownable_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
         setOracle(oracle);
         i_vault = IVault(vault);
+        gasLimit = gasCallback;
     }
 
     function version() public pure returns (string memory) {
@@ -73,10 +73,10 @@ contract StoreManagerV2 is
         string memory shippingCompany,
         bytes32 orderId,
         bytes memory company
-    ) internal {
+    ) public {
         Functions.Request memory req;
         req.initializeRequestForInlineJavaScript(string(lambdaFunction));
-        req.addInlineSecrets(lambdaSecrets);
+        // req.addInlineSecrets(lambdaSecrets);
         string[4] memory setter = [trackingNumber, shippingCompany, string(abi.encodePacked(orderId)), string(company)];
         string[] memory args = new string[](setter.length);
         for (uint256 i = 0; i < setter.length; i++) {
@@ -94,6 +94,7 @@ contract StoreManagerV2 is
             if (status == uint8(IStore.Status.DELIVERED)) {
                 _removeFromQueue(orderNumber, bytes(company));
                 _updateOrderStatus(orderNumber, bytes(company), IStore.Status.DELIVERED);
+                _unlockFunds(bytes(company), orderNumber);
             } else {
                 IStore(stores[bytes(company)]).getOrder(orderNumber).lastAutomationCheck = block.timestamp;
             }
@@ -125,7 +126,7 @@ contract StoreManagerV2 is
             }
         }
 
-        return (upkeepNeeded, performData);
+        return (upkeepNeeded, company);
     }
 
     function performUpkeep(bytes calldata performData) external override whenNotPaused nonReentrant {
@@ -173,6 +174,11 @@ contract StoreManagerV2 is
         companyQueue[company].add(orderId);
     }
 
+    function _unlockFunds(bytes memory company, bytes32 orderId) internal {
+        IStore.Order memory order = IStore(stores[company]).getOrder(orderId);
+        i_vault.unlockFunds(stores[company], order.value);
+    }
+
     // Admin functions ---------------------------------------------------------
 
     /**
@@ -190,11 +196,11 @@ contract StoreManagerV2 is
         emit StoreAdded(company, store);
     }
 
-    function getQueueLength(bytes memory company) external view onlyOwner returns (uint256) {
+    function getQueueLength(bytes memory company) external view returns (uint256) {
         return companyQueue[company].length();
     }
 
-    function getOracleAddress() external view onlyOwner returns (address) {
+    function getOracleAddress() external view returns (address) {
         return getChainlinkOracleAddress();
     }
 
