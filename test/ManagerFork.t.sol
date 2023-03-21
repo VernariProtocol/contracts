@@ -6,6 +6,11 @@ import "forge-std/console.sol";
 import {StoreManager} from "../contracts/StoreManager.sol";
 import {Vault} from "../contracts/Vault.sol";
 import "../contracts/proxy/UUPSProxy.sol";
+import {Example} from "../contracts/Example.sol";
+
+interface FunctionsBillingRegistryInterface {
+    function addConsumer(uint64 subscriptionId, address consumer) external;
+}
 
 contract NetworkForkTest is Test {
     using stdJson for string;
@@ -17,8 +22,12 @@ contract NetworkForkTest is Test {
     Config config;
     UUPSProxy proxy;
     StoreManager proxyManager;
+    FunctionsBillingRegistryInterface billing;
+    Example example;
+    bytes lambda;
 
     struct Config {
+        uint32 gasLimit;
         address oracle;
     }
 
@@ -31,33 +40,45 @@ contract NetworkForkTest is Test {
         return abi.decode(rawConfig, (Config));
     }
 
-    function setUp() public {
-        network = vm.createSelectFork(vm.rpcUrl("mumbai"));
-        admin = makeAddr("admin");
-        manager = StoreManager(0x3A010951F54F3B05239f48aD4edF7DCB39e9f0D1);
+    function getLambda(string memory input) internal view returns (bytes memory) {
+        /// @dev Stringify the lambda function
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, input);
+        string memory lambda = vm.readFile(path);
+        return bytes(lambda);
     }
 
     // function setUp() public {
     //     network = vm.createSelectFork(vm.rpcUrl("mumbai"));
-    //     config = configureNetwork("manager-config");
     //     admin = makeAddr("admin");
-    //     vm.startPrank(admin);
-    //     vault = new Vault();
-
-    //     StoreManager impl = new StoreManager(config.oracle);
-    //     proxy = new UUPSProxy(
-    //         address(impl),
-    //         abi.encodeWithSignature(
-    //             "initialize(address,address,uint32)",
-    //             config.oracle,
-    //             address(vault),
-    //             300_000
-    //         )
-    //     );
-    //     proxyManager = StoreManager(address(proxy));
-    //     vault.setStoreManager(address(proxyManager));
-    //     vm.stopPrank();
+    //     manager = StoreManager(0x3A010951F54F3B05239f48aD4edF7DCB39e9f0D1);
     // }
+
+    function setUp() public {
+        lambda = getLambda("/lambdas/shipping-oracle.js");
+        network = vm.createSelectFork(vm.rpcUrl("mumbai"));
+        config = configureNetwork("manager-config");
+        admin = makeAddr("admin");
+        vm.startPrank(0x4Fdd54a50623a7C7b5b3055700eB4872356bd5b3);
+        vault = new Vault();
+        example = new Example(config.oracle);
+
+        StoreManager impl = new StoreManager(config.oracle);
+        proxy = new UUPSProxy(
+            address(impl),
+            abi.encodeWithSignature(
+                "initialize(address,address,uint32)",
+                config.oracle,
+                address(vault),
+                200_000
+            )
+        );
+        proxyManager = StoreManager(address(proxy));
+        proxyManager.setLambda(lambda);
+        vault.setStoreManager(address(proxyManager));
+        FunctionsBillingRegistryInterface(0xEe9Bf52E5Ea228404bB54BCFbbDa8c21131b9039).addConsumer(393, address(example));
+        vm.stopPrank();
+    }
 
     function test_getPubKey() public view {
         address a = proxyManager.getOracleAddress();
@@ -66,13 +87,16 @@ contract NetworkForkTest is Test {
         console.logBytes(v);
     }
 
-    function testFork_managerCheckUpkeep() public {
-        // manager.requestTracking(
-        //     "SHIPPO_TRANSIT",
-        //     "usps",
-        //     0x23dc111d7c3ad1df9806ce1e8eb4f55f57dba117339c545e7593d1f6c3b02662,
-        //     bytes("company1")
-        // );
-        manager.requestTracking("SHIPPO_TRANSIT", "shippo", keccak256(abi.encodePacked("one")), bytes("company1"));
+    // function testFork_managerCheckUpkeep() public {
+    //     vm.startPrank(0x4Fdd54a50623a7C7b5b3055700eB4872356bd5b3);
+    //     proxyManager.getOracleAddress();
+    //     // proxyManager.requestTracking("SHIPPO_TRANSIT", "shippo", keccak256(abi.encodePacked("one")), bytes("company1"));
+    //     example.SendRequest(string(lambda), "", new string[](0), 393);
+    // }
+
+    function test_bytes32ToString() public {
+        bytes32 x = keccak256(abi.encodePacked("one"));
+        string memory s = example.bytes32ToHexString(x);
+        console.log(s);
     }
 }

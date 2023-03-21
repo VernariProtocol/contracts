@@ -9,7 +9,8 @@ import {UUPSUpgradeable} from "@openzeppelin-upgrades/contracts/proxy/utils/UUPS
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {AutomationCompatibleInterface} from "@chainlink/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
+import {AutomationCompatibleInterface} from
+    "@chainlink/src/v0.8/interfaces/automation/AutomationCompatibleInterface.sol";
 import {FunctionsClient, Functions} from "@chainlink/src/v0.8/dev/functions/FunctionsClient.sol";
 import {IStoreManager} from "../interfaces/IStoreManager.sol";
 import {IStore} from "../interfaces/IStore.sol";
@@ -84,7 +85,7 @@ contract StoreManagerV2 is
         }
         req.addArgs(args);
 
-        bytes32 assignedReqID = sendRequest(req, IStore(stores[company]).getSubscriptionId(), gasLimit, tx.gasprice);
+        bytes32 assignedReqID = sendRequest(req, IStore(stores[company]).getSubscriptionId(), gasLimit);
         companyRequests[assignedReqID] = company;
     }
 

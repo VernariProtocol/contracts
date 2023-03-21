@@ -18,7 +18,7 @@ deploy-manager:
 	forge script script/2.StoreManager.s.sol:StoreManagerScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv
 
 deploy-factory:
-	forge script script/3.StoreFactory.s.sol:StoreFactoryScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv
+	forge script script/3.StoreFactory.s.sol:StoreFactoryScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv --legacy
 
 set-lambda:
 	forge script script/SetLambda.s.sol:SetLambdaScript --rpc-url ${RPC_URL} --broadcast --verify -vvvv
@@ -31,3 +31,6 @@ store:
 
 upgrade-manager:
 	forge script script/UpgradeStoreManager.s.sol:UpgradeStoreManagerScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv
+
+example:
+	forge script script/Example.s.sol:ExampleScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv
