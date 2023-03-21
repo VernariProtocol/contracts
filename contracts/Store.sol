@@ -68,22 +68,18 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     function addOrder(bytes32 orderNumber, uint256 amount) external payable override {
         require(!orders[orderNumber].active, "Store: order already exists");
         require(msg.value >= amount, "Store: not enough sent");
-        bytes32 orderId = keccak256(abi.encodePacked(orderNumber));
         orders[orderNumber] = Order({
-            Id: orderId,
+            Id: orderNumber,
             trackingNumber: "",
             company: string(companyName),
             status: Status.PENDING,
             lastUpdate: block.timestamp,
-            lastPrice: 0,
-            lastDepth: 0,
-            lastLimit: 0,
-            lastQueue: 0,
             active: true,
             notes: new bytes[](0),
-            lastAutomationCheck: block.timestamp
+            lastAutomationCheck: block.timestamp,
+            value: amount
         });
-        storeManager.registerOrder(orderId, companyName);
+        storeManager.registerOrder(orderNumber, companyName);
         storeManager.depositOrderAmount{value: msg.value}(companyName);
         emit OrderCreated(orderNumber, msg.value);
     }

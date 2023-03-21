@@ -39,26 +39,21 @@ contract StoreFactory is IStoreFactory, Ownable {
         _;
     }
 
-    constructor(
-        address bluePrint,
-        string memory version,
-        address storeManager
-    ) {
+    constructor(address bluePrint, string memory version, address storeManager) {
         beacon = new StoreBeacon(bluePrint, version);
         manager = storeManager;
     }
 
     /**
-     * @notice Creates a new instance of the UniswapV2TWAPOracle contract.
+     * @notice Creates a new instance of the Store contract.
      * @param admin The address of who will own the contract.
      * @return The address of the new instance.
      */
-    function createStore(
-        address admin,
-        bytes calldata companyName,
-        uint64 subId,
-        uint96 automationInterval
-    ) external hasAnInstance(admin) returns (address) {
+    function createStore(address admin, bytes calldata companyName, uint64 subId, uint96 automationInterval)
+        external
+        hasAnInstance(admin)
+        returns (address)
+    {
         BeaconProxy proxy = new BeaconProxy(
             address(beacon),
             abi.encodeCall(
@@ -84,10 +79,7 @@ contract StoreFactory is IStoreFactory, Ownable {
      * @param newBlueprint The address of the new implementation.
      * @param updatedVersion The version of the new implementation.
      */
-    function updateBeaconInstance(
-        address newBlueprint,
-        string calldata updatedVersion
-    ) external onlyOwner {
+    function updateBeaconInstance(address newBlueprint, string calldata updatedVersion) external onlyOwner {
         beacon.update(newBlueprint, updatedVersion);
     }
 
@@ -95,9 +87,7 @@ contract StoreFactory is IStoreFactory, Ownable {
      * @notice Returns the address of an instance.
      * @param instanceOwner The address of the contract owner.
      */
-    function getInstance(
-        address instanceOwner
-    ) external view returns (address) {
+    function getInstance(address instanceOwner) external view returns (address) {
         if (!isInstance[instanceOwner]) {
             revert InstanceDoesNotExist();
         }

@@ -7,4 +7,6 @@ interface IVault {
     function withdraw(uint256 amount, address payable account) external;
 
     function withdrawableAmount() external view returns (uint256);
+
+    function unlockFunds(address account, uint256 amount) external;
 }

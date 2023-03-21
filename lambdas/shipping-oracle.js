@@ -1,14 +1,15 @@
+const util = require("util");
+
 function encodeValue(types, value) {
   if (types.length !== value.length) {
     throw new Error("Invalid value");
   }
-  const encoder = new TextEncoder();
+  const encoder = new util.TextEncoder();
   let encodedValue = "";
   let v;
   let padded;
 
   for (let i = 0; i < types.length; i++) {
-    console.log(types[i], value[i]);
     switch (types[i]) {
       case "string":
         encodedValue = encodedValue.concat(padNumber(value.length * 32));
@@ -38,7 +39,7 @@ function encodeValue(types, value) {
         encodedValue = encodedValue.concat(padded + v);
         break;
       case "bytes32":
-        encodedValue = encodedValue.concat(value[i].toString().slice(2));
+        encodedValue = encodedValue.concat(value[i].toString());
         break;
       default:
         throw new Error("Unsupported value type");
@@ -58,10 +59,13 @@ const baseURL = `https://api.goshippo.com/tracks/`;
 const trackingNumber = args[0];
 const shippingCompany = args[1];
 const orderId = args[2];
-const store = args[3];
+const url = `${baseURL}${shippingCompany}/${trackingNumber}`;
 
 const apiRequest = Functions.makeHttpRequest({
-  url: baseURL,
+  url: url,
+  headers: {
+    Authorization: `ShippoToken ${secrets.shippoKey}`,
+  },
 });
 
 const res = await apiRequest;
@@ -70,16 +74,12 @@ if (res.error) {
 }
 
 const trackingStatus = res.data.tracking_status.status;
+console.log(trackingStatus);
 let statusInt = 0;
 if (trackingStatus === "DELIVERED") {
   statusInt = 2;
 }
 
-// encode status (uint8), orderNumber (bytes32), company (string)
-
-const encoded = encodeValue(
-  ["uint", "bytes32", "string"],
-  [statusInt, orderId, shippingCompany]
-);
+const encoded = encodeValue(["uint", "bytes32"], [statusInt, orderId]);
 
 return Functions.encodeString(encoded);

@@ -16,13 +16,10 @@ interface IStore {
         string company;
         Status status;
         uint256 lastUpdate;
-        uint256 lastPrice;
-        uint256 lastDepth;
-        uint256 lastLimit;
-        uint256 lastQueue;
         bool active;
         bytes[] notes;
         uint256 lastAutomationCheck;
+        uint256 value;
     }
 
     function version() external pure returns (string memory);

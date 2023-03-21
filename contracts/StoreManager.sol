@@ -9,11 +9,13 @@ import {UUPSUpgradeable} from "@openzeppelin-upgrades/contracts/proxy/utils/UUPS
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {AutomationCompatibleInterface} from "@chainlink/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
+import {AutomationCompatibleInterface} from
+    "@chainlink/src/v0.8/interfaces/automation/AutomationCompatibleInterface.sol";
 import {FunctionsClient, Functions} from "@chainlink/src/v0.8/dev/functions/FunctionsClient.sol";
 import {IStoreManager} from "./interfaces/IStoreManager.sol";
 import {IStore} from "./interfaces/IStore.sol";
 import {IVault} from "./interfaces/IVault.sol";
+import "forge-std/console.sol";
 
 contract StoreManager is
     IStoreManager,
@@ -31,12 +33,10 @@ contract StoreManager is
 
     IVault i_vault;
 
-    uint256 interval;
-
-    bytes internal latestError;
-    bytes internal lambdaFunction;
-    bytes internal lambdaSecrets;
-    uint32 internal gasLimit;
+    bytes public latestError;
+    bytes public lambdaFunction;
+    bytes public lambdaSecrets;
+    uint32 public gasLimit;
 
     mapping(bytes => EnumerableSet.Bytes32Set) private companyQueue;
     mapping(bytes => bool) private activeCompanies;
@@ -52,12 +52,13 @@ contract StoreManager is
         _disableInitializers();
     }
 
-    function initialize(address oracle, address vault) public initializer {
+    function initialize(address oracle, address vault, uint32 gasCallback) public initializer {
         __Ownable_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
         setOracle(oracle);
         i_vault = IVault(vault);
+        gasLimit = gasCallback;
     }
 
     function version() public pure returns (string memory) {
@@ -73,29 +74,31 @@ contract StoreManager is
         string memory shippingCompany,
         bytes32 orderId,
         bytes memory company
-    ) internal {
+    ) public {
         Functions.Request memory req;
         req.initializeRequestForInlineJavaScript(string(lambdaFunction));
-        req.addInlineSecrets(lambdaSecrets);
-        string[4] memory setter = [trackingNumber, shippingCompany, string(abi.encodePacked(orderId)), string(company)];
+        req.addRemoteSecrets(lambdaSecrets);
+        string[3] memory setter = [trackingNumber, shippingCompany, _bytes32ToHexString(orderId)];
         string[] memory args = new string[](setter.length);
         for (uint256 i = 0; i < setter.length; i++) {
             args[i] = setter[i];
         }
         req.addArgs(args);
 
-        bytes32 assignedReqID = sendRequest(req, IStore(stores[company]).getSubscriptionId(), gasLimit, tx.gasprice);
+        bytes32 assignedReqID = sendRequest(req, IStore(stores[company]).getSubscriptionId(), gasLimit);
         companyRequests[assignedReqID] = company;
     }
 
     function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
+        bytes memory company = companyRequests[requestId];
         if (response.length != 0) {
-            (uint8 status, bytes32 orderNumber, string memory company) = abi.decode(response, (uint8, bytes32, string));
+            (uint8 status, bytes32 orderNumber) = abi.decode(response, (uint8, bytes32));
             if (status == uint8(IStore.Status.DELIVERED)) {
-                _removeFromQueue(orderNumber, bytes(company));
-                _updateOrderStatus(orderNumber, bytes(company), IStore.Status.DELIVERED);
+                _removeFromQueue(orderNumber, company);
+                _updateOrderStatus(orderNumber, company, IStore.Status.DELIVERED);
+                _unlockFunds(company, orderNumber);
             } else {
-                IStore(stores[bytes(company)]).getOrder(orderNumber).lastAutomationCheck = block.timestamp;
+                IStore(stores[company]).getOrder(orderNumber).lastAutomationCheck = block.timestamp;
             }
         } else {
             latestError = err;
@@ -125,7 +128,7 @@ contract StoreManager is
             }
         }
 
-        return (upkeepNeeded, performData);
+        return (upkeepNeeded, company);
     }
 
     function performUpkeep(bytes calldata performData) external override whenNotPaused nonReentrant {
@@ -173,6 +176,24 @@ contract StoreManager is
         companyQueue[company].add(orderId);
     }
 
+    function _unlockFunds(bytes memory company, bytes32 orderId) internal {
+        IStore.Order memory order = IStore(stores[company]).getOrder(orderId);
+        i_vault.unlockFunds(stores[company], order.value);
+    }
+
+    function _bytes32ToHexString(bytes32 input) public pure returns (string memory) {
+        bytes memory alphabet = "0123456789abcdef";
+        bytes memory result = new bytes(64);
+
+        for (uint256 i = 0; i < 32; i++) {
+            uint8 currentByte = uint8(input[i]);
+            result[i * 2] = alphabet[currentByte >> 4];
+            result[i * 2 + 1] = alphabet[currentByte & 0x0f];
+        }
+
+        return string(result);
+    }
+
     // Admin functions ---------------------------------------------------------
 
     /**
@@ -190,11 +211,11 @@ contract StoreManager is
         emit StoreAdded(company, store);
     }
 
-    function getQueueLength(bytes memory company) external view onlyOwner returns (uint256) {
+    function getQueueLength(bytes memory company) external view returns (uint256) {
         return companyQueue[company].length();
     }
 
-    function getOracleAddress() external view onlyOwner returns (address) {
+    function getOracleAddress() external view returns (address) {
         return getChainlinkOracleAddress();
     }
 

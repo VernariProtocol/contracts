@@ -27,14 +27,15 @@ contract StoreManagerTest is Test {
         store1Owner = makeAddr("store1Owner");
         vm.startPrank(admin);
         vault = new Vault();
-        // deploy the implementation contract and remember to initialize it
+
         StoreManager impl = new StoreManager(oracle);
         proxy = new UUPSProxy(
             address(impl),
             abi.encodeWithSignature(
-                "initialize(address,address)",
+                "initialize(address,address,uint32)",
                 oracle,
-                address(vault)
+                address(vault),
+                500_000
             )
         );
         proxyManager = StoreManager(address(proxy));
@@ -45,9 +46,19 @@ contract StoreManagerTest is Test {
     function createStoreFixture() public {
         vm.startPrank(admin);
         store1 = new Store();
-        store1.initialize(address(proxyManager), store1Owner, bytes("the store"), 1, (60 * 60 * 6));
+        store1.initialize(address(proxyManager), store1Owner, bytes("the store"), 1, (60));
         proxyManager.addCompany(address(store1));
         vm.stopPrank();
+    }
+
+    function automationFixture() public {
+        createStoreFixture();
+        address user = makeAddr("user");
+        vm.prank(user);
+        vm.deal(user, 1 ether);
+        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 1 ether);
+        vm.prank(store1Owner);
+        store1.updateOrder(keccak256(abi.encodePacked("some order")), "tracking", "usps");
     }
 
     function test_upgrade_upgradeStoreManager() public {
@@ -72,4 +83,25 @@ contract StoreManagerTest is Test {
         vm.prank(admin);
         assert(proxyManager.getOracleAddress() == oracle);
     }
+
+    function test_checkUpkeep_returnsTrue() public {
+        automationFixture();
+        vm.warp(block.timestamp + 61);
+        (bool upkeepNeeded,) = proxyManager.checkUpkeep(bytes("the store"));
+        assertTrue(upkeepNeeded);
+    }
+
+    function testRevert_checkUpkeep_storeDoesntExist() public {
+        automationFixture();
+        vm.expectRevert("StoreManager: company must be active");
+        proxyManager.checkUpkeep(bytes("doesnt exist"));
+    }
+
+    // function test_performUpkeep_returnsTrue() public {
+    //     automationFixture();
+    //     vm.warp(block.timestamp + 61);
+    //     proxyManager.performUpkeep(bytes("the store"));
+    // }
+
+    function test_checkOracle() public {}
 }

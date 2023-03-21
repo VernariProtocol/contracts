@@ -75,13 +75,10 @@ contract StoreV2 is IStore, Initializable, ReentrancyGuardUpgradeable, PausableU
             company: string(companyName),
             status: Status.PENDING,
             lastUpdate: block.timestamp,
-            lastPrice: 0,
-            lastDepth: 0,
-            lastLimit: 0,
-            lastQueue: 0,
             active: true,
             notes: new bytes[](0),
-            lastAutomationCheck: 0
+            lastAutomationCheck: 0,
+            value: amount
         });
         storeManager.registerOrder(orderId, companyName);
         storeManager.depositOrderAmount{value: msg.value}(companyName);
