@@ -1,0 +1,13 @@
+{
+  "storeFactory": "0x7bC230DD4bF25fc076224387a043324527D7d29A",
+  "admin": "0x4Fdd54a50623a7C7b5b3055700eB4872356bd5b3",
+  "subId": 393,
+  "storeManager": "0x7630bE18D3e46e4E1d5bAeaE15707cA15Da4CD68",
+  "blueprint": "0x220Fe5Fb322b03381Ef73B33F3E3B83fE3E8867a",
+  "version": "v0.0.1",
+  "functionsRegistry": "0xEe9Bf52E5Ea228404bB54BCFbbDa8c21131b9039",
+  "oracle": "0xeA6721aC65BCeD841B8ec3fc5fEdeA6141a0aDE4",
+  "gasLimit": 200000,
+  "vault": "0x4bc7367f6A85b66CE30daD3dC2b8E548044419F1",
+  "currentStore": "0x1EE8fD6f073d019857f8C08CAeE2ff83f8AA3f7d"
+}

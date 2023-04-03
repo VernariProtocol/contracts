@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Script.sol";
-import "forge-std/StdJson.sol";
+import {Utils} from "../contracts/utils/Utils.sol";
 import {StoreManager} from "../contracts/StoreManager.sol";
 
-contract SetLambdaScript is Script {
-    using stdJson for string;
-
+contract SetLambdaScript is Utils {
     StoreManager manager;
     uint256 deployerPrivateKey;
 
@@ -29,7 +26,7 @@ contract SetLambdaScript is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        manager = StoreManager(0x2A351AA96706afD92508c6e769cc95717f1D62bc);
+        manager = StoreManager(getValue("storeManager"));
 
         manager.setLambda(lambda);
 

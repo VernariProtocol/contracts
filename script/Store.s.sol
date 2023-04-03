@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Script.sol";
-import "forge-std/StdJson.sol";
+import {Utils} from "../contracts/utils/Utils.sol";
 import {Store} from "../contracts/Store.sol";
 import {StoreManager} from "../contracts/StoreManager.sol";
 
-contract StoreScript is Script {
-    using stdJson for string;
-
+contract StoreScript is Utils {
     Store store;
     StoreManager manager;
     uint256 deployerPrivateKey;
@@ -20,8 +17,8 @@ contract StoreScript is Script {
             deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         }
         vm.startBroadcast(deployerPrivateKey);
-        store = Store(payable(0x1EE8fD6f073d019857f8C08CAeE2ff83f8AA3f7d));
-        manager = StoreManager(0x7630bE18D3e46e4E1d5bAeaE15707cA15Da4CD68);
+        store = Store(payable(getValue("currentStore")));
+        manager = StoreManager(getValue("storeManager"));
         // store.addOrder{value: 0.01 ether}(keccak256(abi.encodePacked("four")), 0.01 ether);
         store.updateOrder(keccak256(abi.encodePacked("four")), "SHIPPO_DELIVERED", "shippo");
         // store.withdrawVaultFunds(0.02 ether);

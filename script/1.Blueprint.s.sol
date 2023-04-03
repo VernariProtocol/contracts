@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Script.sol";
 import {Store} from "../contracts/Store.sol";
+import {Utils} from "../contracts/utils/Utils.sol";
 
-contract StoreScript is Script {
+contract StoreScript is Utils {
     Store blueprint;
     uint256 deployerPrivateKey;
 
@@ -18,7 +18,7 @@ contract StoreScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         blueprint = new Store();
-
+        updateDeployment(address(blueprint), "blueprint");
         vm.stopBroadcast();
     }
 }

@@ -1,39 +1,20 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Script.sol";
-import "forge-std/StdJson.sol";
 import {StoreManager} from "../contracts/StoreManager.sol";
 import {UUPSProxy} from "../contracts/proxy/UUPSProxy.sol";
 import {Vault} from "../contracts/Vault.sol";
+import {Utils} from "../contracts/utils/Utils.sol";
 
 interface FunctionsBillingRegistryInterface {
     function addConsumer(uint64 subscriptionId, address consumer) external;
 }
 
-contract StoreManagerScript is Script {
-    using stdJson for string;
-
+contract StoreManagerScript is Utils {
     StoreManager impl;
     Vault vault;
     UUPSProxy proxy;
     uint256 deployerPrivateKey;
-    Config config;
-
-    struct Config {
-        uint32 gasLimit;
-        address oracle;
-        bytes secret;
-    }
-
-    function configureNetwork(string memory input) internal view returns (Config memory) {
-        string memory inputDir = string.concat(vm.projectRoot(), "/script/input/");
-        string memory chainDir = string.concat(vm.toString(block.chainid), "/");
-        string memory file = string.concat(input, ".json");
-        string memory data = vm.readFile(string.concat(inputDir, chainDir, file));
-        bytes memory rawConfig = data.parseRaw("");
-        return abi.decode(rawConfig, (Config));
-    }
 
     function getLambda(string memory input) internal view returns (bytes memory) {
         /// @dev Stringify the lambda function
@@ -44,7 +25,6 @@ contract StoreManagerScript is Script {
     }
 
     function run() public {
-        config = configureNetwork("manager-config");
         bytes memory lambda = getLambda("/lambdas/shipping-oracleV2.js");
         if (block.chainid == 31337) {
             deployerPrivateKey = vm.envUint("ANVIL_PRIVATE_KEY");
@@ -53,20 +33,21 @@ contract StoreManagerScript is Script {
         }
 
         vm.startBroadcast(deployerPrivateKey);
-
-        impl = new StoreManager(config.oracle);
+        address oracle = getValue("oracle");
+        impl = new StoreManager(oracle);
         vault = new Vault();
+        updateDeployment(address(vault), "vault");
         proxy = new UUPSProxy(
             address(impl),
             abi.encodeWithSignature(
                 "initialize(address,address,uint32)",
-                config.oracle,
+                oracle,
                 address(vault),
-                config.gasLimit
+                200_000
             )
         );
+        updateDeployment(address(proxy), "storeManager");
         vault.setStoreManager(address(proxy));
-        console.log("StoreManager address: ", address(proxy));
         FunctionsBillingRegistryInterface(0xEe9Bf52E5Ea228404bB54BCFbbDa8c21131b9039).addConsumer(393, address(proxy));
         StoreManager(address(proxy)).setLambda(lambda);
         // StoreManager(address(proxy)).setSecrets(config.secret);

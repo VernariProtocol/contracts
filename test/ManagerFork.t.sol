@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
+import {Utils} from "../contracts/utils/Utils.sol";
 import {StoreManager} from "../contracts/StoreManager.sol";
 import {StoreFactory} from "../contracts/StoreFactory.sol";
 import {Store} from "../contracts/Store.sol";
@@ -28,9 +29,7 @@ interface FunctionsBillingRegistryInterface {
     }
 }
 
-contract NetworkForkTest is Test {
-    using stdJson for string;
-
+contract NetworkForkTest is Test, Utils {
     StoreManager manager;
     StoreFactory factory;
     Store blueprint;
@@ -38,25 +37,10 @@ contract NetworkForkTest is Test {
     address admin;
     uint256 network;
     Vault vault;
-    Config config;
     UUPSProxy proxy;
     StoreManager proxyManager;
     FunctionsBillingRegistryInterface billing;
     bytes lambda;
-
-    struct Config {
-        uint32 gasLimit;
-        address oracle;
-    }
-
-    function configureNetwork(string memory input) internal view returns (Config memory) {
-        string memory inputDir = string.concat(vm.projectRoot(), "/script/input/");
-        string memory chainDir = string.concat(vm.toString(block.chainid), "/");
-        string memory file = string.concat(input, ".json");
-        string memory data = vm.readFile(string.concat(inputDir, chainDir, file));
-        bytes memory rawConfig = data.parseRaw("");
-        return abi.decode(rawConfig, (Config));
-    }
 
     function getLambda(string memory input) internal view returns (bytes memory) {
         /// @dev Stringify the lambda function
@@ -75,18 +59,18 @@ contract NetworkForkTest is Test {
     function setUp() public {
         lambda = getLambda("/lambdas/shipping-oracleV2.js");
         network = vm.createSelectFork(vm.rpcUrl("mumbai"));
-        config = configureNetwork("manager-config");
         blueprint = new Store();
         admin = makeAddr("admin");
         vm.startPrank(0x4Fdd54a50623a7C7b5b3055700eB4872356bd5b3);
         vault = new Vault();
 
-        StoreManager impl = new StoreManager(config.oracle);
+        address oracle = getValue("oracle");
+        StoreManager impl = new StoreManager(oracle);
         proxy = new UUPSProxy(
             address(impl),
             abi.encodeWithSignature(
                 "initialize(address,address,uint32)",
-                config.oracle,
+                oracle,
                 address(vault),
                 200_000
             )

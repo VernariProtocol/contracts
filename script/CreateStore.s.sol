@@ -1,37 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Script.sol";
-import "forge-std/StdJson.sol";
 import {StoreFactory} from "../contracts/StoreFactory.sol";
 import {StoreManager} from "../contracts/StoreManager.sol";
+import {Utils} from "../contracts/utils/Utils.sol";
 
-contract CreateStoreScript is Script {
-    using stdJson for string;
-
+contract CreateStoreScript is Utils {
     StoreFactory factory;
     StoreManager manager;
     uint256 deployerPrivateKey;
-    Config config;
-
-    struct Config {
-        address admin;
-        address factory;
-        address manager;
-        uint64 subId;
-    }
-
-    function configureNetwork(string memory input) internal view returns (Config memory) {
-        string memory inputDir = string.concat(vm.projectRoot(), "/script/input/");
-        string memory chainDir = string.concat(vm.toString(block.chainid), "/");
-        string memory file = string.concat(input, ".json");
-        string memory data = vm.readFile(string.concat(inputDir, chainDir, file));
-        bytes memory rawConfig = data.parseRaw("");
-        return abi.decode(rawConfig, (Config));
-    }
+    uint64 subId = 393;
+    uint96 autoInterval = 180;
 
     function run() public {
-        config = configureNetwork("address-config");
         if (block.chainid == 31337) {
             deployerPrivateKey = vm.envUint("ANVIL_PRIVATE_KEY");
         } else {
@@ -40,10 +21,12 @@ contract CreateStoreScript is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        factory = StoreFactory(config.factory);
-        manager = StoreManager(config.manager);
-        address newStore = factory.createStore(config.admin, bytes("company1"), config.subId, 180);
+        factory = StoreFactory(getValue("storeFactory"));
+        manager = StoreManager(getValue("storeManager"));
+        address newStore = factory.createStore(getValue("admin"), bytes("company1"), subId, autoInterval);
         manager.addCompany(newStore);
+
+        updateDeployment(newStore, "currentStore");
 
         vm.stopBroadcast();
     }
