@@ -101,10 +101,9 @@ contract StoreManager is
                 IStore(stores[company]).getOrder(orderNumber).lastAutomationCheck = block.timestamp;
             }
         } else {
-            latestError = err;
             emit FullfillmentError(requestId, err, companyRequests[requestId]);
         }
-
+        latestError = err;
         emit OCRResponse(requestId, response, err);
     }
 
@@ -141,6 +140,7 @@ contract StoreManager is
                 order.status == IStore.Status.SHIPPED
                     && block.timestamp - order.lastAutomationCheck > IStore(stores[company]).getAutomationInterval()
             ) {
+                IStore(stores[company]).getOrder(orderId).lastAutomationCheck = block.timestamp;
                 requestTracking(order.trackingNumber, order.company, orderId, company);
             }
         }

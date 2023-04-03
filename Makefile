@@ -6,8 +6,15 @@ install:
 clean:
 	remove :; rm -rf .gitmodules && rm -rf .git/modules/* && rm -rf lib && touch .gitmodules && git add . && git commit -m "modules"
 
+# tests
 tests:
-	forge test -vvvv
+	forge test -vvvvv
+
+test-contracts-offline:
+	forge test --no-match-test testFork -vvvvv
+
+test-contracts-online:
+	forge test --match-test testFork -vvvvv
 
 # Scripts
 

@@ -104,4 +104,10 @@ contract StoreManagerTest is Test {
     // }
 
     function test_checkOracle() public {}
+
+    function test_bytes32ToString() public view {
+        bytes32 x = keccak256(abi.encodePacked("one"));
+        string memory s = proxyManager._bytes32ToHexString(x);
+        console.log(s);
+    }
 }

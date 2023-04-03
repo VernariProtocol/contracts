@@ -44,9 +44,10 @@ contract StoreManagerTest is Test {
         proxy = new UUPSProxy(
             address(impl),
             abi.encodeWithSignature(
-                "initialize(address,address)",
+                "initialize(address,address,uint32)",
                 oracle,
-                address(vault)
+                address(vault),
+                200_000
             )
         );
         proxyManager = StoreManager(address(proxy));

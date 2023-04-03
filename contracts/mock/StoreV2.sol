@@ -159,7 +159,7 @@ contract StoreV2 is IStore, Initializable, ReentrancyGuardUpgradeable, PausableU
      * @notice the amount available to withdraw from finished orders.
      */
     function getWithdrawableAmount() external view returns (uint256) {
-        return IVault(storeManager.getVault()).withdrawableAmount();
+        return IVault(storeManager.getVault()).withdrawableAmount(address(this));
     }
 
     function addWhiteListedAddress(address addr) external onlyOwner {

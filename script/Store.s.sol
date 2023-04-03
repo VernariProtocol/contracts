@@ -22,10 +22,11 @@ contract StoreScript is Script {
         vm.startBroadcast(deployerPrivateKey);
         store = Store(payable(0x1EE8fD6f073d019857f8C08CAeE2ff83f8AA3f7d));
         manager = StoreManager(0x7630bE18D3e46e4E1d5bAeaE15707cA15Da4CD68);
-        // store.addOrder{value: 0.01 ether}(keccak256(abi.encodePacked("one")), 0.01 ether);
-        // store.updateOrder(keccak256(abi.encodePacked("one")), "SHIPPO_DELIVERED", "shippo");
-        // store.withdrawVaultFunds(0.01 ether);
-        address(store).balance;
+        // store.addOrder{value: 0.01 ether}(keccak256(abi.encodePacked("four")), 0.01 ether);
+        store.updateOrder(keccak256(abi.encodePacked("four")), "SHIPPO_DELIVERED", "shippo");
+        // store.withdrawVaultFunds(0.02 ether);
+        // store.withdraw();
+        // address(store).balance;
         // manager.requestTracking("SHIPPO_TRANSIT", "shippo", keccak256(abi.encodePacked("one")), bytes("company1"));
 
         vm.stopBroadcast();

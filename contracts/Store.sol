@@ -162,7 +162,7 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
      * @notice the amount available to withdraw from finished orders.
      */
     function getWithdrawableAmount() external view returns (uint256) {
-        return IVault(storeManager.getVault()).withdrawableAmount();
+        return IVault(storeManager.getVault()).withdrawableAmount(address(this));
     }
 
     function addWhiteListedAddress(address addr) external onlyOwner {
