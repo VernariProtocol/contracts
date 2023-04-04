@@ -157,8 +157,12 @@ contract StoreManager is
         i_vault.deposit{value: msg.value}(store);
     }
 
-    function withdrawVaultAmount(uint256 amount) external {
-        i_vault.withdraw(amount, payable(msg.sender));
+    function withdrawVaultGasToken(uint256 amount) external {
+        i_vault.withdrawGasToken(amount, payable(msg.sender));
+    }
+
+    function withdrawVaultTokenAsset(uint256 amount, address token) external {
+        i_vault.withdrawTokenAsset(amount, token, msg.sender);
     }
 
     // Internal functions ------------------------------------------------------

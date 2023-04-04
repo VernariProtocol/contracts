@@ -24,7 +24,7 @@ interface IStore {
 
     function version() external pure returns (string memory);
 
-    function addOrder(bytes32 orderNumber, uint256 amount) external payable;
+    function addOrder(bytes32 orderNumber, uint256 amount, bool gasToken, address tokenAsset) external payable;
 
     function updateOrderStatus(bytes32 orderId, Status status) external;
 
@@ -39,5 +39,17 @@ interface IStore {
 
     function getAutomationInterval() external view returns (uint96);
 
-    function withdraw() external;
+    function withdrawGasToken() external;
+    function withdrawTokenAsset(address token) external;
+
+    function getWithdrawableGasTokenAmount() external view returns (uint256);
+    function getWithdrawableAssetTokenAmount(address token) external view returns (uint256);
+    function getLockedGasTokenAmount() external view returns (uint256);
+    function getLockedAssetTokenAmount(address token) external view returns (uint256);
+
+    function addWhitelistedToken(address token) external;
+    function removeWhitelistedToken(address token) external;
+
+    function addWhiteListedAddress(address addr) external;
+    function removeWhiteListedAddress(address addr) external;
 }

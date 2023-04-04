@@ -4,9 +4,16 @@ pragma solidity ^0.8.13;
 interface IVault {
     function deposit(address account) external payable;
 
-    function withdraw(uint256 amount, address payable account) external;
+    function withdrawGasToken(uint256 amount, address payable account) external;
 
-    function withdrawableAmount(address store) external view returns (uint256);
+    function withdrawTokenAsset(uint256 amount, address token, address account) external;
+
+    function withdrawableGasTokenAmount(address account) external view returns (uint256);
+    function withdrawableAssetTokenAmount(address account, address token) external view returns (uint256);
+
+    function getLockedGasTokenBalance(address account) external view returns (uint256);
+    function getLockedAssetTokenBalance(address account, address token) external view returns (uint256);
 
     function unlockFunds(address account, uint256 amount) external;
+    function depositToken(address token, uint256 amount) external;
 }

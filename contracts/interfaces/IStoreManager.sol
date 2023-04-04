@@ -12,5 +12,7 @@ interface IStoreManager {
 
     function getVault() external view returns (address);
 
-    function withdrawVaultAmount(uint256 amount) external;
+    function withdrawVaultGasToken(uint256 amount) external;
+
+    function withdrawVaultTokenAsset(uint256 amount, address token) external;
 }
