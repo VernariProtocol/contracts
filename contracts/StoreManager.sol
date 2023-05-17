@@ -157,8 +157,12 @@ contract StoreManager is
         i_vault.deposit{value: msg.value}(store);
     }
 
-    function withdrawVaultAmount(uint256 amount) external {
-        i_vault.withdraw(amount, payable(msg.sender));
+    function withdrawVaultGasToken(uint256 amount) external {
+        i_vault.withdrawGasToken(amount, payable(msg.sender));
+    }
+
+    function withdrawVaultTokenAsset(uint256 amount, address token) external {
+        i_vault.withdrawTokenAsset(amount, token, msg.sender);
     }
 
     // Internal functions ------------------------------------------------------
@@ -203,7 +207,7 @@ contract StoreManager is
      */
     function addCompany(address store) external override onlyOwner {
         require(store != address(0), "StoreManager: store cannot be zero address");
-        bytes memory company = IStore(store).getCompanyName();
+        bytes memory company = bytes(IStore(store).getCompanyName());
         require(!activeCompanies[company], "StoreManager: company must not be active");
         require(stores[company] == address(0), "StoreManager: company must not have a store");
         stores[company] = store;

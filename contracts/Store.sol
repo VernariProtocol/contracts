@@ -5,14 +5,16 @@ import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initia
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin-upgrades/contracts/security/PausableUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IStore} from "./interfaces/IStore.sol";
 import {IStoreManager} from "./interfaces/IStoreManager.sol";
 import {IVault} from "./interfaces/IVault.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, OwnableUpgradeable {
-    using SafeERC20 for IERC20Metadata;
+    using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     IStoreManager public storeManager;
     bytes internal companyName;
@@ -20,6 +22,8 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     uint96 automationCheckInterval;
     mapping(address => bool) internal whitelist;
     mapping(bytes32 => Order) internal orders;
+    Order[] public orderList;
+    EnumerableSet.AddressSet internal whitelistedTokens;
 
     event OrderCreated(bytes32 indexed orderNumber, uint256 amount);
     event OrderUpdated(bytes32 indexed orderNumber, Status status);
@@ -29,6 +33,13 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
             msg.sender == address(storeManager) || msg.sender == owner() || whitelist[msg.sender],
             "Store: only an admin can call this function"
         );
+        _;
+    }
+
+    modifier whitelistedToken(address token, bool gasToken) {
+        if (!gasToken) {
+            require(whitelistedTokens.contains(token), "Store: token is not whitelisted");
+        }
         _;
     }
 
@@ -65,9 +76,19 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
      * @param orderNumber the order ID from internal business
      * @param amount the amount of the order.
      */
-    function addOrder(bytes32 orderNumber, uint256 amount) external payable override {
+    function addOrder(bytes32 orderNumber, uint256 amount, bool gasToken, address tokenAsset)
+        external
+        payable
+        override
+        whitelistedToken(tokenAsset, gasToken)
+    {
         require(!orders[orderNumber].active, "Store: order already exists");
-        require(msg.value >= amount, "Store: not enough sent");
+        if (gasToken) {
+            require(msg.value >= amount, "Store: not enough sent");
+        } else {
+            IERC20(tokenAsset).safeTransferFrom(msg.sender, address(this), amount);
+        }
+
         orders[orderNumber] = Order({
             Id: orderNumber,
             trackingNumber: "",
@@ -79,9 +100,17 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
             lastAutomationCheck: block.timestamp,
             value: amount
         });
+        orderList.push(orders[orderNumber]);
         storeManager.registerOrder(orderNumber, companyName);
-        storeManager.depositOrderAmount{value: msg.value}(companyName);
-        emit OrderCreated(orderNumber, msg.value);
+        if (gasToken) {
+            storeManager.depositOrderAmount{value: msg.value}(companyName);
+            emit OrderCreated(orderNumber, msg.value);
+        } else {
+            // depost token asset to vault
+            IERC20(tokenAsset).safeApprove(storeManager.getVault(), amount);
+            IVault(storeManager.getVault()).depositToken(tokenAsset, amount);
+            emit OrderCreated(orderNumber, amount);
+        }
     }
 
     /**
@@ -95,6 +124,7 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
      * @param shippingCompany the shipping company.
      * @dev can only be called by the owner (company).
      * @dev called by store owner when the order is shipped.
+     * @dev tracking number/shipping company will need to be encrypted.
      */
     function updateOrder(bytes32 orderId, string memory trackingNumber, string memory shippingCompany)
         external
@@ -122,20 +152,39 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         emit OrderUpdated(orderId, orders[orderId].status);
     }
 
-    function withdrawVaultFunds(uint256 amount) external onlyAdmin {
-        storeManager.withdrawVaultAmount(amount);
+    // TODO: have store owner decide how they want to handle locked funds?
+    function addFundsToStrategy() external onlyAdmin {}
+
+    function withdrawVaultGasToken(uint256 amount) external onlyAdmin {
+        storeManager.withdrawVaultGasToken(amount);
+    }
+
+    function withdrawVaultTokenAsset(uint256 amount, address token) external onlyAdmin {
+        storeManager.withdrawVaultTokenAsset(amount, token);
     }
 
     function getOrder(bytes32 orderId) external view returns (Order memory) {
         return orders[orderId];
     }
 
-    function getCompanyName() external view returns (bytes memory) {
-        return companyName;
+    function getOrders() external view returns (Order[] memory) {
+        return orderList;
+    }
+
+    function getCompanyName() external view returns (string memory) {
+        return string(companyName);
     }
 
     function getSubscriptionId() external view onlyAdmin returns (uint64) {
         return subscriptionId;
+    }
+
+    function getWhitelistedTokens() external view returns (address[] memory) {
+        address[] memory _whitelistedTokens = new address[](whitelistedTokens.length());
+        for (uint256 i = 0; i < whitelistedTokens.length(); i++) {
+            _whitelistedTokens[i] = whitelistedTokens.at(i);
+        }
+        return _whitelistedTokens;
     }
 
     function pause() external onlyOwner {
@@ -161,8 +210,20 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     /**
      * @notice the amount available to withdraw from finished orders.
      */
-    function getWithdrawableAmount() external view returns (uint256) {
-        return IVault(storeManager.getVault()).withdrawableAmount(address(this));
+    function getWithdrawableGasTokenAmount() external view returns (uint256) {
+        return IVault(storeManager.getVault()).withdrawableGasTokenAmount(address(this));
+    }
+
+    function getWithdrawableAssetTokenAmount(address token) external view returns (uint256) {
+        return IVault(storeManager.getVault()).withdrawableAssetTokenAmount(address(this), token);
+    }
+
+    function getLockedGasTokenAmount() external view returns (uint256) {
+        return IVault(storeManager.getVault()).getLockedGasTokenBalance(address(this));
+    }
+
+    function getLockedAssetTokenAmount(address token) external view returns (uint256) {
+        return IVault(storeManager.getVault()).getLockedAssetTokenBalance(address(this), token);
     }
 
     function addWhiteListedAddress(address addr) external onlyOwner {
@@ -173,10 +234,24 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         whitelist[addr] = false;
     }
 
-    function withdraw() external onlyOwner {
+    function addWhitelistedToken(address token) external onlyOwner {
+        whitelistedTokens.add(token);
+    }
+
+    function removeWhitelistedToken(address token) external onlyOwner {
+        whitelistedTokens.remove(token);
+    }
+
+    function withdrawGasToken() external onlyOwner {
         uint256 amount = address(this).balance;
         require(amount > 0, "Store: no funds to withdraw");
         payable(msg.sender).transfer(amount);
+    }
+
+    function withdrawTokenAsset(address token) external onlyOwner {
+        uint256 amount = IERC20(token).balanceOf(address(this));
+        require(amount > 0, "Store: no funds to withdraw");
+        IERC20(token).safeTransfer(msg.sender, amount);
     }
 
     receive() external payable {}

@@ -24,20 +24,34 @@ interface IStore {
 
     function version() external pure returns (string memory);
 
-    function addOrder(bytes32 orderNumber, uint256 amount) external payable;
+    function addOrder(bytes32 orderNumber, uint256 amount, bool gasToken, address tokenAsset) external payable;
 
     function updateOrderStatus(bytes32 orderId, Status status) external;
 
     function getOrder(bytes32 orderId) external view returns (Order memory);
 
+    function getOrders() external view returns (Order[] memory);
+
     function initialize(address manager, address owner, bytes memory company, uint64 subId, uint96 automationInterval)
         external;
 
-    function getCompanyName() external view returns (bytes memory);
+    function getCompanyName() external view returns (string memory);
 
     function getSubscriptionId() external view returns (uint64);
 
     function getAutomationInterval() external view returns (uint96);
 
-    function withdraw() external;
+    function withdrawGasToken() external;
+    function withdrawTokenAsset(address token) external;
+
+    function getWithdrawableGasTokenAmount() external view returns (uint256);
+    function getWithdrawableAssetTokenAmount(address token) external view returns (uint256);
+    function getLockedGasTokenAmount() external view returns (uint256);
+    function getLockedAssetTokenAmount(address token) external view returns (uint256);
+
+    function addWhitelistedToken(address token) external;
+    function removeWhitelistedToken(address token) external;
+
+    function addWhiteListedAddress(address addr) external;
+    function removeWhiteListedAddress(address addr) external;
 }

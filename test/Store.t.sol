@@ -54,11 +54,11 @@ contract StoreTest is Test {
         address user = makeAddr("user");
         vm.prank(user);
         vm.deal(user, 1 ether);
-        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 1 ether);
+        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 1 ether, true, address(0));
         vm.prank(admin);
         assertEq(proxyManager.getQueueLength(bytes("the store")), 1);
         assertEq(address(vault).balance, 1 ether);
-        assertEq(vault.getLockedBalance(address(store1)), 1 ether);
+        assertEq(vault.getLockedGasTokenBalance(address(store1)), 1 ether);
     }
 
     function testRevert_addOrder_NotEnoughGasTokenSent() public {
@@ -67,7 +67,7 @@ contract StoreTest is Test {
         vm.prank(user);
         vm.deal(user, 1 ether);
         vm.expectRevert("Store: not enough sent");
-        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 2 ether);
+        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 2 ether, true, address(0));
     }
 
     function testRevert_addOrder_OrderAlreadyExists() public {
@@ -76,11 +76,11 @@ contract StoreTest is Test {
         vm.prank(user);
 
         vm.deal(user, 1 ether);
-        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 1 ether);
+        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 1 ether, true, address(0));
         vm.deal(user, 1 ether);
         vm.prank(user);
         vm.expectRevert("Store: order already exists");
-        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 1 ether);
+        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 1 ether, true, address(0));
     }
 
     function test_getWithdrawableAmount_getAmount() public {
@@ -88,11 +88,11 @@ contract StoreTest is Test {
         address user = makeAddr("user");
         vm.prank(user);
         vm.deal(user, 1 ether);
-        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 1 ether);
+        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 1 ether, true, address(0));
         vm.prank(admin);
         assertEq(proxyManager.getQueueLength(bytes("the store")), 1);
         assertEq(address(vault).balance, 1 ether);
-        assertEq(vault.getLockedBalance(address(store1)), 1 ether);
-        assertEq(store1.getWithdrawableAmount(), 0);
+        assertEq(vault.getLockedGasTokenBalance(address(store1)), 1 ether);
+        assertEq(store1.getWithdrawableGasTokenAmount(), 0);
     }
 }

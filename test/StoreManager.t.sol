@@ -56,7 +56,7 @@ contract StoreManagerTest is Test {
         address user = makeAddr("user");
         vm.prank(user);
         vm.deal(user, 1 ether);
-        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 1 ether);
+        store1.addOrder{value: 1 ether}(keccak256(abi.encodePacked("some order")), 1 ether, true, address(0));
         vm.prank(store1Owner);
         store1.updateOrder(keccak256(abi.encodePacked("some order")), "tracking", "usps");
     }
