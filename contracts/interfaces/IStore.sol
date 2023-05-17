@@ -33,7 +33,7 @@ interface IStore {
     function initialize(address manager, address owner, bytes memory company, uint64 subId, uint96 automationInterval)
         external;
 
-    function getCompanyName() external view returns (bytes memory);
+    function getCompanyName() external view returns (string memory);
 
     function getSubscriptionId() external view returns (uint64);
 

@@ -4,16 +4,26 @@ pragma solidity ^0.8.13;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IPool} from "@aave/interfaces/IPool.sol";
+import {IAToken} from "@aave/interfaces/IAToken.sol";
 
 contract Vault is Ownable {
     using SafeERC20 for IERC20;
 
+    uint256 private constant BASIS_POINTS_TOTAL = 10000;
     address public manager;
+    uint256 public withdrawalFee;
+
     mapping(address => uint256) internal lockedGasTokenBalances;
     mapping(address => uint256) internal unlockedGasTokenBalances;
     mapping(address => mapping(address => uint256)) internal lockedTokenBalances;
     mapping(address => mapping(address => uint256)) internal unlockedTokenBalances;
+    mapping(address => uint256) internal accumulatedFees;
+
+    // total deposits in vault
     mapping(address => uint256) internal totalDeposits;
+    // asset to pool mapping
+    mapping(address => address) internal assetToPool;
 
     modifier onlyManager() {
         require(msg.sender == manager, "Vault: only manager can call this function");
@@ -34,11 +44,13 @@ contract Vault is Ownable {
 
     // take percentage cut of APY when withdrawing asset
     function depositToken(address token, uint256 amount) external {
+        IPool aToken = IPool(assetToPool[token]);
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         lockedTokenBalances[msg.sender][token] += amount;
         totalDeposits[token] += amount;
 
         IERC20(token).safeApprove(manager, amount);
+        aToken.supply(token, amount, address(this), 0);
     }
 
     function withdrawGasToken(uint256 amount, address payable account) external onlyManager {
@@ -49,12 +61,37 @@ contract Vault is Ownable {
     }
 
     function withdrawTokenAsset(uint256 amount, address token, address account) external onlyManager {
-        require(amount <= unlockedTokenBalances[account][token], "Vault: insufficient funds");
+        uint256 _userShare = unlockedTokenBalances[account][token];
+        require(amount <= _userShare, "Vault: insufficient funds");
+        IPool aPool = IPool(assetToPool[token]);
+        IAToken aToken = IAToken(aPool.getReserveData(token).aTokenAddress);
+
+        // calculate user's share of yield
+        uint256 totalYield = aToken.balanceOf(address(this)) - totalDeposits[token] - accumulatedFees[token];
+        uint256 userYield = (_userShare * totalYield) / (aToken.balanceOf(address(this)) - accumulatedFees[token]);
+        uint256 protocolFee = _getWithdrawalFeeAmount(userYield);
+        uint256 actualYield = userYield - protocolFee;
+
         unlockedTokenBalances[account][token] -= amount;
-        IERC20(token).safeTransfer(account, amount);
+        totalDeposits[token] -= amount;
+        accumulatedFees[token] += protocolFee;
+        aPool.withdraw(token, amount + actualYield, account);
     }
 
-    function _addTokenToStrategy() internal {}
+    function getYieldTotal(address token) external view returns (uint256) {
+        IPool aPool = IPool(assetToPool[token]);
+        IAToken aToken = IAToken(aPool.getReserveData(token).aTokenAddress);
+        return aToken.balanceOf(address(this)) - totalDeposits[token];
+    }
+
+    function getYield(address account, address token) external view returns (uint256) {
+        IPool aPool = IPool(assetToPool[token]);
+        IAToken aToken = IAToken(aPool.getReserveData(token).aTokenAddress);
+        uint256 totalYield = aToken.balanceOf(address(this)) - totalDeposits[token];
+        uint256 userYield = ((lockedTokenBalances[account][token] + unlockedTokenBalances[account][token]) * totalYield)
+            / aToken.balanceOf(address(this));
+        return userYield;
+    }
 
     function unlockFunds(address account, uint256 amount) external onlyManager {
         unlockedGasTokenBalances[account] += amount;
@@ -79,5 +116,15 @@ contract Vault is Ownable {
 
     function setStoreManager(address managerAddress) external onlyOwner {
         manager = managerAddress;
+    }
+
+    /**
+     * @notice returns the withdrawal fee to be paid on a withdrawal
+     * @param _amount amount to withdraw
+     * @return amount of tokens to be paid on withdrawal
+     *
+     */
+    function _getWithdrawalFeeAmount(uint256 _amount) internal view returns (uint256) {
+        return (_amount * withdrawalFee) / BASIS_POINTS_TOTAL;
     }
 }

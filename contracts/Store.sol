@@ -121,6 +121,7 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
      * @param shippingCompany the shipping company.
      * @dev can only be called by the owner (company).
      * @dev called by store owner when the order is shipped.
+     * @dev tracking number/shipping company will need to be encrypted.
      */
     function updateOrder(bytes32 orderId, string memory trackingNumber, string memory shippingCompany)
         external
@@ -163,8 +164,8 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         return orders[orderId];
     }
 
-    function getCompanyName() external view returns (bytes memory) {
-        return companyName;
+    function getCompanyName() external view returns (string memory) {
+        return string(companyName);
     }
 
     function getSubscriptionId() external view onlyAdmin returns (uint64) {
