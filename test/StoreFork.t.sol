@@ -24,12 +24,12 @@ contract NetworkForkTest is Test {
     }
 
     function testFork_getWithdrawableAMount() public view {
-        uint256 v = store.getWithdrawableAmount();
+        uint256 v = store.getWithdrawableGasTokenAmount();
         console.log("name: ", v);
     }
 
     function testFork_getName() public view {
-        bytes memory v = store.getCompanyName();
-        console.log("name: ", string(v));
+        string memory v = store.getCompanyName();
+        console.log("name: ", v);
     }
 }

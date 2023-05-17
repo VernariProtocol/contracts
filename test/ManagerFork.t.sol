@@ -9,7 +9,6 @@ import {StoreFactory} from "../contracts/StoreFactory.sol";
 import {Store} from "../contracts/Store.sol";
 import {Vault} from "../contracts/Vault.sol";
 import "../contracts/proxy/UUPSProxy.sol";
-import {Example} from "../contracts/Example.sol";
 import {FunctionsOracleInterface} from "@chainlink/src/v0.8/dev/interfaces/FunctionsOracleInterface.sol";
 
 interface FunctionsBillingRegistryInterface {

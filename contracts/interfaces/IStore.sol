@@ -30,6 +30,8 @@ interface IStore {
 
     function getOrder(bytes32 orderId) external view returns (Order memory);
 
+    function getOrders() external view returns (Order[] memory);
+
     function initialize(address manager, address owner, bytes memory company, uint64 subId, uint96 automationInterval)
         external;
 

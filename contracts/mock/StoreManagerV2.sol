@@ -33,10 +33,10 @@ contract StoreManagerV2 is
 
     IVault i_vault;
 
-    bytes internal latestError;
-    bytes internal lambdaFunction;
-    bytes internal lambdaSecrets;
-    uint32 internal gasLimit;
+    bytes public latestError;
+    bytes public lambdaFunction;
+    bytes public lambdaSecrets;
+    uint32 public gasLimit;
 
     mapping(bytes => EnumerableSet.Bytes32Set) private companyQueue;
     mapping(bytes => bool) private activeCompanies;
@@ -62,7 +62,7 @@ contract StoreManagerV2 is
     }
 
     function version() public pure returns (string memory) {
-        return "v0.0.2";
+        return "v0.0.1";
     }
 
     function registerOrder(bytes32 orderId, bytes memory company) external override nonReentrant whenNotPaused {
@@ -77,8 +77,8 @@ contract StoreManagerV2 is
     ) public {
         Functions.Request memory req;
         req.initializeRequestForInlineJavaScript(string(lambdaFunction));
-        // req.addInlineSecrets(lambdaSecrets);
-        string[4] memory setter = [trackingNumber, shippingCompany, string(abi.encodePacked(orderId)), string(company)];
+        req.addRemoteSecrets(lambdaSecrets);
+        string[3] memory setter = [trackingNumber, shippingCompany, _bytes32ToHexString(orderId)];
         string[] memory args = new string[](setter.length);
         for (uint256 i = 0; i < setter.length; i++) {
             args[i] = setter[i];
@@ -90,20 +90,20 @@ contract StoreManagerV2 is
     }
 
     function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
+        bytes memory company = companyRequests[requestId];
         if (response.length != 0) {
-            (uint8 status, bytes32 orderNumber, string memory company) = abi.decode(response, (uint8, bytes32, string));
+            (uint8 status, bytes32 orderNumber) = abi.decode(response, (uint8, bytes32));
             if (status == uint8(IStore.Status.DELIVERED)) {
-                _removeFromQueue(orderNumber, bytes(company));
-                _updateOrderStatus(orderNumber, bytes(company), IStore.Status.DELIVERED);
-                _unlockFunds(bytes(company), orderNumber);
+                _removeFromQueue(orderNumber, company);
+                _updateOrderStatus(orderNumber, company, IStore.Status.DELIVERED);
+                _unlockFunds(company, orderNumber);
             } else {
-                IStore(stores[bytes(company)]).getOrder(orderNumber).lastAutomationCheck = block.timestamp;
+                IStore(stores[company]).getOrder(orderNumber).lastAutomationCheck = block.timestamp;
             }
         } else {
-            latestError = err;
             emit FullfillmentError(requestId, err, companyRequests[requestId]);
         }
-
+        latestError = err;
         emit OCRResponse(requestId, response, err);
     }
 
@@ -140,6 +140,7 @@ contract StoreManagerV2 is
                 order.status == IStore.Status.SHIPPED
                     && block.timestamp - order.lastAutomationCheck > IStore(stores[company]).getAutomationInterval()
             ) {
+                IStore(stores[company]).getOrder(orderId).lastAutomationCheck = block.timestamp;
                 requestTracking(order.trackingNumber, order.company, orderId, company);
             }
         }
@@ -156,8 +157,12 @@ contract StoreManagerV2 is
         i_vault.deposit{value: msg.value}(store);
     }
 
-    function withdrawVaultAmount(uint256 amount) external {
-        i_vault.withdraw(amount, payable(msg.sender));
+    function withdrawVaultGasToken(uint256 amount) external {
+        i_vault.withdrawGasToken(amount, payable(msg.sender));
+    }
+
+    function withdrawVaultTokenAsset(uint256 amount, address token) external {
+        i_vault.withdrawTokenAsset(amount, token, msg.sender);
     }
 
     // Internal functions ------------------------------------------------------
@@ -180,6 +185,19 @@ contract StoreManagerV2 is
         i_vault.unlockFunds(stores[company], order.value);
     }
 
+    function _bytes32ToHexString(bytes32 input) public pure returns (string memory) {
+        bytes memory alphabet = "0123456789abcdef";
+        bytes memory result = new bytes(64);
+
+        for (uint256 i = 0; i < 32; i++) {
+            uint8 currentByte = uint8(input[i]);
+            result[i * 2] = alphabet[currentByte >> 4];
+            result[i * 2 + 1] = alphabet[currentByte & 0x0f];
+        }
+
+        return string(result);
+    }
+
     // Admin functions ---------------------------------------------------------
 
     /**
@@ -189,7 +207,7 @@ contract StoreManagerV2 is
      */
     function addCompany(address store) external override onlyOwner {
         require(store != address(0), "StoreManager: store cannot be zero address");
-        bytes memory company = IStore(store).getCompanyName();
+        bytes memory company = bytes(IStore(store).getCompanyName());
         require(!activeCompanies[company], "StoreManager: company must not be active");
         require(stores[company] == address(0), "StoreManager: company must not have a store");
         stores[company] = store;

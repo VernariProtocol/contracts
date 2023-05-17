@@ -22,6 +22,7 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     uint96 automationCheckInterval;
     mapping(address => bool) internal whitelist;
     mapping(bytes32 => Order) internal orders;
+    Order[] public orderList;
     EnumerableSet.AddressSet internal whitelistedTokens;
 
     event OrderCreated(bytes32 indexed orderNumber, uint256 amount);
@@ -99,15 +100,17 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
             lastAutomationCheck: block.timestamp,
             value: amount
         });
+        orderList.push(orders[orderNumber]);
         storeManager.registerOrder(orderNumber, companyName);
         if (gasToken) {
             storeManager.depositOrderAmount{value: msg.value}(companyName);
+            emit OrderCreated(orderNumber, msg.value);
         } else {
             // depost token asset to vault
             IERC20(tokenAsset).safeApprove(storeManager.getVault(), amount);
             IVault(storeManager.getVault()).depositToken(tokenAsset, amount);
+            emit OrderCreated(orderNumber, amount);
         }
-        emit OrderCreated(orderNumber, msg.value);
     }
 
     /**
@@ -162,6 +165,10 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
 
     function getOrder(bytes32 orderId) external view returns (Order memory) {
         return orders[orderId];
+    }
+
+    function getOrders() external view returns (Order[] memory) {
+        return orderList;
     }
 
     function getCompanyName() external view returns (string memory) {
