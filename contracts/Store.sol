@@ -22,8 +22,9 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     uint96 automationCheckInterval;
     mapping(address => bool) internal whitelist;
     mapping(bytes32 => Order) internal orders;
-    Order[] public orderList;
     EnumerableSet.AddressSet internal whitelistedTokens;
+
+    Order[] internal orderList;
 
     event OrderCreated(bytes32 indexed orderNumber, uint256 amount);
     event OrderUpdated(bytes32 indexed orderNumber, Status status);
@@ -175,7 +176,7 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         return string(companyName);
     }
 
-    function getSubscriptionId() external view onlyAdmin returns (uint64) {
+    function getSubscriptionId() external view returns (uint64) {
         return subscriptionId;
     }
 

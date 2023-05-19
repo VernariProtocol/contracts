@@ -1,7 +1,10 @@
 -include .env
 
-install:
+init-install:
 	forge install Openzeppelin/openzeppelin-contracts foundry-rs/forge-std Openzeppelin/openzeppelin-contracts-upgradeable smartcontractkit/chainlink
+
+install:
+	forge install
 
 clean:
 	remove :; rm -rf .gitmodules && rm -rf .git/modules/* && rm -rf lib && touch .gitmodules && git add . && git commit -m "modules"
@@ -39,5 +42,5 @@ store:
 upgrade-manager:
 	forge script script/UpgradeStoreManager.s.sol:UpgradeStoreManagerScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv
 
-example:
-	forge script script/Example.s.sol:ExampleScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv
+update-blueprint:
+	forge script script/UpdateBlueprint.s.sol:UpdateBlueprintScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv --ffi
