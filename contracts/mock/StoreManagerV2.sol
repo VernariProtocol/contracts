@@ -43,6 +43,8 @@ contract StoreManagerV2 is
     mapping(bytes => address) internal stores;
     mapping(bytes32 => bytes) internal companyRequests;
 
+      address public automationRegistry;
+
     event OCRResponse(bytes32 indexed requestId, bytes result, bytes err);
     event FullfillmentError(bytes32 indexed requestId, bytes err, bytes company);
     event StoreAdded(bytes indexed company, address indexed store);

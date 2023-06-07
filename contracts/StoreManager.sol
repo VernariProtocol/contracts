@@ -15,7 +15,7 @@ import {FunctionsClient, Functions} from "@chainlink/src/v0.8/dev/functions/Func
 import {IStoreManager} from "./interfaces/IStoreManager.sol";
 import {IStore} from "./interfaces/IStore.sol";
 import {IVault} from "./interfaces/IVault.sol";
-import "forge-std/console.sol";
+
 
 contract StoreManager is
     IStoreManager,
@@ -42,6 +42,9 @@ contract StoreManager is
     mapping(bytes => bool) private activeCompanies;
     mapping(bytes => address) internal stores;
     mapping(bytes32 => bytes) internal companyRequests;
+
+    address public automationRegistry;
+    bytes public res;
 
     event OCRResponse(bytes32 indexed requestId, bytes result, bytes err);
     event FullfillmentError(bytes32 indexed requestId, bytes err, bytes company);
@@ -92,6 +95,7 @@ contract StoreManager is
     function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         bytes memory company = companyRequests[requestId];
         if (response.length != 0) {
+            
             (uint8 status, bytes32 orderNumber) = abi.decode(response, (uint8, bytes32));
             if (status == uint8(IStore.Status.DELIVERED)) {
                 _removeFromQueue(orderNumber, company);
@@ -104,6 +108,7 @@ contract StoreManager is
             emit FullfillmentError(requestId, err, companyRequests[requestId]);
         }
         latestError = err;
+        res = response;
         emit OCRResponse(requestId, response, err);
     }
 
@@ -231,12 +236,20 @@ contract StoreManager is
         lambdaSecrets = secrets;
     }
 
+    function setAutomationRegistry(address registry) external onlyOwner {
+        automationRegistry = registry;
+    }
+
     function updateOracleAddress(address oracle) external onlyOwner {
         setOracle(oracle);
     }
 
     function getVault() external view returns (address) {
         return address(i_vault);
+    }
+
+    function updateVault(address vault) external onlyOwner {
+        i_vault = IVault(vault);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}

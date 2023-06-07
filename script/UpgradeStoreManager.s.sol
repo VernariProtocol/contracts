@@ -16,7 +16,7 @@ contract UpgradeStoreManagerScript is Utils {
         }
         vm.startBroadcast(deployerPrivateKey);
         newVersion = new StoreManager(getValue("oracle"));
-        StoreManager(getValue("manager")).upgradeTo(address(newVersion));
+        StoreManager(getValue("storeManager")).upgradeTo(address(newVersion));
 
         vm.stopBroadcast();
     }

@@ -19,12 +19,8 @@ contract StoreScript is Utils {
         vm.startBroadcast(deployerPrivateKey);
         store = Store(payable(getValue("currentStore")));
         manager = StoreManager(getValue("storeManager"));
-        // store.addOrder{value: 0.01 ether}(keccak256(abi.encodePacked("four")), 0.01 ether);
-        store.updateOrder(keccak256(abi.encodePacked("four")), "SHIPPO_DELIVERED", "shippo");
-        // store.withdrawVaultFunds(0.02 ether);
-        // store.withdraw();
-        // address(store).balance;
-        // manager.requestTracking("SHIPPO_TRANSIT", "shippo", keccak256(abi.encodePacked("one")), bytes("company1"));
+        store.addOrder{value: 0.01 ether}(keccak256(abi.encodePacked("seven")), 0.01 ether, true, address(0));
+
 
         vm.stopBroadcast();
     }

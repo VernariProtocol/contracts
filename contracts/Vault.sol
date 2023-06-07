@@ -6,8 +6,11 @@ import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IPool} from "@aave/interfaces/IPool.sol";
 import {IAToken} from "@aave/interfaces/IAToken.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
-contract Vault is Ownable {
+contract Vault is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     using SafeERC20 for IERC20;
 
     uint256 private constant BASIS_POINTS_TOTAL = 10000;
@@ -36,7 +39,17 @@ contract Vault is Ownable {
     // maybe have a feature to pay out in asset of their choice?
     // buffer in vault so fees arnt too high?
 
-    constructor() {}
+       /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _manager) public initializer {
+        __Ownable_init();
+        __UUPSUpgradeable_init();
+        manager = _manager;
+        withdrawalFee = 0;
+    }
 
     function deposit(address account) external payable onlyManager {
         lockedGasTokenBalances[account] += msg.value;
@@ -127,4 +140,6 @@ contract Vault is Ownable {
     function _getWithdrawalFeeAmount(uint256 _amount) internal view returns (uint256) {
         return (_amount * withdrawalFee) / BASIS_POINTS_TOTAL;
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 }

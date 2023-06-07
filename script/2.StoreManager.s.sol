@@ -12,8 +12,9 @@ interface FunctionsBillingRegistryInterface {
 
 contract StoreManagerScript is Utils {
     StoreManager impl;
-    Vault vault;
+    Vault vaultImpl;
     UUPSProxy proxy;
+    UUPSProxy vaultProxy;
     uint256 deployerPrivateKey;
 
     function getLambda(string memory input) internal view returns (bytes memory) {
@@ -35,19 +36,26 @@ contract StoreManagerScript is Utils {
         vm.startBroadcast(deployerPrivateKey);
         address oracle = getValue("oracle");
         impl = new StoreManager(oracle);
-        vault = new Vault();
-        updateDeployment(address(vault), "vault");
+        vaultImpl = new Vault();
+        vaultProxy = new UUPSProxy(
+            address(vaultImpl),
+            abi.encodeWithSignature(
+                "initialize(address)",
+                address(0)
+            )
+        );
+        updateDeployment(address(vaultProxy), "vault");
         proxy = new UUPSProxy(
             address(impl),
             abi.encodeWithSignature(
                 "initialize(address,address,uint32)",
                 oracle,
-                address(vault),
+                address(vaultProxy),
                 200_000
             )
         );
         updateDeployment(address(proxy), "storeManager");
-        vault.setStoreManager(address(proxy));
+        Vault(address(vaultProxy)).setStoreManager(address(proxy));
         FunctionsBillingRegistryInterface(0xEe9Bf52E5Ea228404bB54BCFbbDa8c21131b9039).addConsumer(393, address(proxy));
         StoreManager(address(proxy)).setLambda(lambda);
         // StoreManager(address(proxy)).setSecrets(config.secret);
@@ -58,4 +66,13 @@ contract StoreManagerScript is Utils {
     }
 }
 
-//secret: 0xd9db9172cd2679e65a24b81a5bf8d513021a942d9ffc54d6ae98f9745f16762e574e53c2ef9fa2a2e58275a32a9ed4eddd6bc2936122222d9c91f548cd1290f599d5b1e0e22f2eb64c5e3142fe8a935bcdb9a69eb06c4338621e05c0ddf74c77e206a141387ff4db210d4aca41dc811fa3418c040501a76514bdd896a38f4b0e2bd8f743194cf4104dbd6438b7d54f9e0cc370acbe424c9cbe3621141ecd1d0f93
+//secret: 0x9ca278b7c7d17d6af5a3e49fa0b76d690322720c9e75803da8dbe630eefc6fe8d30e1033fbbb682b4c639a1878b4ff8a223ac1652b28d1a0a8b600928cfc2a1ac6b24e82ca99f9b5db1b8168f760e23de8f163fa1d590448b01b1b7faeb262b107b42353112fa27fa5069dddfc1a4b7a36a1c64c08dc7029b076b0b32ec348e9d2425f92856ff334757e26699a59fa98b936fedec6179804aca50debf87694839f
+//  secretsURLs: ["https://gist.github.com/AnonJon/22b0a97dca2c34479e2eda1fba92ceb9/raw/"],
+//   // Default offchain secrets object used by the `functions-build-offchain-secrets` command
+//   globalOffchainSecrets: { shippoKey: "shippo_test_5de1485867e4d855bb88b921b51e2eea65479053" },
+// source: fs.readFileSync("./shipping-oracle.js").toString(),
+//   walletPrivateKey: process.env["PRIVATE_KEY"],
+//   // args can be accessed within the source code with `args[index]` (ie: args[0])
+//   args: ["SHIPPO_TRANSIT", "shippo", "23dc111d7c3ad1df9806ce1e8eb4f55f57dba117339c545e7593d1f6c3b02662"],
+//   // expected type of the returned value
+//   expectedReturnType: ReturnType.string,

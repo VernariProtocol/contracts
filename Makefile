@@ -37,10 +37,13 @@ deploy-new-store:
 	forge script script/CreateStore.s.sol:CreateStoreScript --rpc-url ${RPC_URL} --broadcast --verify -vvvv
 
 store:
-	forge script script/Store.s.sol:StoreScript --rpc-url ${RPC_URL} --broadcast --verify -vvvv
+	forge script script/Store.s.sol:StoreScript --rpc-url ${RPC_URL} --broadcast --verify -vvvv --ffi
 
 upgrade-manager:
-	forge script script/UpgradeStoreManager.s.sol:UpgradeStoreManagerScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv
+	forge script script/UpgradeStoreManager.s.sol:UpgradeStoreManagerScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify --ffi -vvvv
 
 update-blueprint:
 	forge script script/UpdateBlueprint.s.sol:UpdateBlueprintScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv --ffi
+
+upgrade-vault:
+	forge script script/UpgradeVault.s.sol:UpgradeVaultScript --rpc-url ${RPC_URL} --etherscan-api-key ${EXPLORER_KEY} --broadcast --verify -vvvv --ffi

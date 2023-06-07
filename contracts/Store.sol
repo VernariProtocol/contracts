@@ -11,6 +11,7 @@ import {IStore} from "./interfaces/IStore.sol";
 import {IStoreManager} from "./interfaces/IStoreManager.sol";
 import {IVault} from "./interfaces/IVault.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {AutomationRegistryInterface, UpkeepInfo} from "@chainlink/src/v0.8/interfaces/automation/2_0/AutomationRegistryInterface2_0.sol";
 
 contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpgradeable, OwnableUpgradeable {
     using SafeERC20 for IERC20;
@@ -23,8 +24,8 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     mapping(address => bool) internal whitelist;
     mapping(bytes32 => Order) internal orders;
     EnumerableSet.AddressSet internal whitelistedTokens;
-
-    Order[] internal orderList;
+    bytes32[] private orderIds;
+    uint256 internal upkeepId;
 
     event OrderCreated(bytes32 indexed orderNumber, uint256 amount);
     event OrderUpdated(bytes32 indexed orderNumber, Status status);
@@ -101,7 +102,8 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
             lastAutomationCheck: block.timestamp,
             value: amount
         });
-        orderList.push(orders[orderNumber]);
+        orderIds.push(orderNumber);
+
         storeManager.registerOrder(orderNumber, companyName);
         if (gasToken) {
             storeManager.depositOrderAmount{value: msg.value}(companyName);
@@ -136,6 +138,7 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         orders[orderId].company = shippingCompany;
         orders[orderId].status = Status.SHIPPED;
         orders[orderId].lastUpdate = block.timestamp;
+
         emit OrderUpdated(orderId, orders[orderId].status);
     }
 
@@ -169,7 +172,11 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
     }
 
     function getOrders() external view returns (Order[] memory) {
-        return orderList;
+        Order[] memory _orders = new Order[](orderIds.length);
+        for (uint256 i = 0; i < orderIds.length; i++) {
+            _orders[i] = orders[orderIds[i]];
+        }
+        return _orders;
     }
 
     function getCompanyName() external view returns (string memory) {
@@ -208,6 +215,10 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
         return automationCheckInterval;
     }
 
+    function setUpkeepId(uint256 id) external onlyOwner {
+        upkeepId = id;
+    }
+
     /**
      * @notice the amount available to withdraw from finished orders.
      */
@@ -225,6 +236,15 @@ contract Store is IStore, Initializable, ReentrancyGuardUpgradeable, PausableUpg
 
     function getLockedAssetTokenAmount(address token) external view returns (uint256) {
         return IVault(storeManager.getVault()).getLockedAssetTokenBalance(address(this), token);
+    }
+
+    function getUpkeepId() external view returns (uint256) {
+        return upkeepId;
+    }
+
+    function automationBalance() external view returns (uint256 claimable) {
+        UpkeepInfo memory _info = AutomationRegistryInterface(storeManager.automationRegistry()).getUpkeep(upkeepId);
+        claimable = _info.balance;
     }
 
     function addWhiteListedAddress(address addr) external onlyOwner {
